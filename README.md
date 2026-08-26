@@ -1,2 +1,183 @@
 # deposition-toolkit
-Set of tools to help prepare files, generate CCDs, create report for a deposition for OneDep deposition
+
+Tools for preparing crystallographic deposition datasets, creating CCDs, updating
+mmCIF metadata, and depositing structures through OneDep.
+
+The command-line entry point is:
+
+```bash
+uv run deposition-toolkit <command> [args]
+```
+
+For local source-tree development before installation, this also works:
+
+```bash
+python main.py <command> [args]
+```
+
+## Workflow
+
+The intended sequence is:
+
+1. `prepare-dataset`
+2. `submission-report`
+3. `mmcif-validation`
+4. `analyse-chains`
+5. `enrich-metadata`
+6. `ccd-creation`
+7. `ccd-annotate`
+8. `ccd-finalise`
+9. `lig-rename`
+10. `resolution_cleanup`
+11. `deposit`
+
+Each structure directory has a `manifest.json` that records top-level state and
+per-step status. Writes are atomic: the manifest is written to a temporary file
+in the same directory and then renamed into place.
+
+Example structure manifest:
+
+```json
+{
+  "structure_id": "A71EV2A-x0836",
+  "group_id": "G_01",
+  "chains": "single",
+  "excluded": false,
+  "steps": {
+    "prepare_dataset": {
+      "status": "done",
+      "timestamp": "2026-08-25T20:41:06+00:00",
+      "outputs": ["pdb_depo_files/A71EV2A-x0836/A71EV2A-x0836_struc.cif"]
+    }
+  }
+}
+```
+
+If `excluded` is `true`, the wrapper skips that structure for later commands and
+records the step as `not applicable`.
+
+## Commands
+
+| Command | Main command module | Stage implementation |
+| --- | --- | --- |
+| `prepare-dataset <tarball>` | `deposition_toolkit.commands.prepare_dataset` | `stages.prepare_dataset.prepare_dataset` |
+| `submission-report <work-dir> <group-id>` | `deposition_toolkit.commands.submission_report` | `stages.prepare_dataset.dep_report` |
+| `mmcif-validation <work-dir>` | `deposition_toolkit.commands.mmcif_validation` | `stages.validate.mmcif_validate` |
+| `analyse-chains <work-dir>` | `deposition_toolkit.commands.analyse_chains` | `stages.analyse_chains.analysis_polymer_chains` |
+| `enrich-metadata <work-dir> <metadata-json>` | `deposition_toolkit.commands.enrich_metadata` | `stages.metadata_enrichment.enrich_cif` |
+| `ccd-creation <work-dir>` | `deposition_toolkit.commands.ccd_creation` | `stages.ccd_creation.ccd_creator` |
+| `ccd-annotate <work-dir>` | `deposition_toolkit.commands.ccd_annotate` | `stages.ccd_creation.annotate_comp` |
+| `ccd-finalise <work-dir>` | `deposition_toolkit.commands.ccd_finalise` | `stages.ccd_creation.finalise_step.finalize_ccds` |
+| `lig-rename <work-dir>` | `deposition_toolkit.commands.lig_rename` | `stages.ccd_creation.ligand_renaming.lig_renaming` |
+| `resolution_cleanup <work-dir>` | `deposition_toolkit.commands.resolution_cleanup` | `stages.resolution_cleanup.resolution_cleanup` |
+| `deposit <work-dir>` | `deposition_toolkit.commands.deposit` | `stages.deposit.deposition` |
+
+Each command module owns its own argument parser and runner. The top-level CLI in
+`deposition_toolkit.cli` only registers command modules and dispatches to the
+selected runner.
+
+## Examples
+
+Prepare a work directory and initialize manifests:
+
+```bash
+uv run deposition-toolkit prepare-dataset \
+  /nfs/ftp/private/pdbedeb-transfer/xchem/A71EV2A_datapack_depo_20260615.tgz
+```
+
+Create the submission report:
+
+```bash
+uv run deposition-toolkit submission-report /path/to/work-dir G_01
+```
+
+Run mmCIF validation:
+
+```bash
+uv run deposition-toolkit mmcif-validation \
+  /path/to/work-dir \
+  --dictionary /path/to/mmcif_pdbx_v50.dic
+```
+
+Enrich coordinate CIFs in place from metadata JSON:
+
+```bash
+uv run deposition-toolkit enrich-metadata \
+  /path/to/work-dir \
+  /path/to/metadata.json \
+  --dictionary /path/to/mmcif_pdbx_v50.dic
+```
+
+Create, annotate, and finalize CCDs:
+
+```bash
+uv run deposition-toolkit ccd-creation /path/to/work-dir
+
+uv run deposition-toolkit ccd-annotate \
+  /path/to/work-dir \
+  --annotate-bin /nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/cc-tools-v2/bin/annotateComp
+
+uv run deposition-toolkit ccd-finalise \
+  /path/to/work-dir \
+  --existing-descriptors-file /path/to/existing_descriptors.csv
+```
+
+Rename `LIG` in coordinate files using final CCD summary output:
+
+```bash
+uv run deposition-toolkit lig-rename /path/to/work-dir
+```
+
+Clean up resolution values:
+
+```bash
+uv run deposition-toolkit resolution_cleanup /path/to/work-dir --pattern '*_struc.cif'
+```
+
+Deposit active structures:
+
+```bash
+uv run deposition-toolkit deposit \
+  /path/to/work-dir \
+  --email depositor@example.org \
+  --users 0000-0002-8612-9539
+```
+
+## CCD finalisation safety
+
+`ccd-finalise` is intentionally non-destructive by default.
+
+- It does not allocate new CCD codes unless `--allocate-codes` is passed.
+- It does not commit to CVS unless `--commit-mode dry-run` or `--commit-mode prompt` is passed.
+- `--commit-mode prompt` requires an interactive confirmation in the finalizer.
+
+If CCD codes were allocated once, reuse the generated `allocated_ccd_codes.csv`
+with `--code-map-file` on later reruns to avoid consuming additional IDs.
+
+## Outputs
+
+Most command outputs are written under `<work-dir>/results`:
+
+- `results/submission_report/`
+- `results/logs/`
+- `results/ccd/stage_1/`
+- `results/ccd/stage_2/`
+- `results/ccd/final/`
+
+Per-structure state is always recorded in:
+
+```text
+<structure-dir>/manifest.json
+```
+
+## Adding a command
+
+1. Create `src/deposition_toolkit/commands/<new_command>.py`.
+2. Implement `register(subparsers)` and `run(args)`.
+3. Import the command module in `src/deposition_toolkit/commands/__init__.py`.
+4. Add the module to `COMMAND_MODULES`.
+5. Put reusable stage logic under `src/stages/<stage_name>/`.
+
+Keep CLI parsing in the command module and keep reusable processing logic in the
+stage module. This keeps the command surface easy to scan while making stages
+importable from tests or future orchestration code.

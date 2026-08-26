@@ -1,3 +1,4 @@
+.DS_Store
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -98,7 +99,7 @@ ipython_config.py
 #   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
-# uv.lock
+uv.lock
 
 # poetry
 #   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
@@ -127,25 +128,25 @@ ipython_config.py
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
 __pypackages__/
 
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
+# # Celery stuff
+# celerybeat-schedule
+# celerybeat.pid
 
-# Redis
-*.rdb
-*.aof
-*.pid
+# # Redis
+# *.rdb
+# *.aof
+# *.pid
 
-# RabbitMQ
-mnesia/
-rabbitmq/
-rabbitmq-data/
+# # RabbitMQ
+# mnesia/
+# rabbitmq/
+# rabbitmq-data/
 
-# ActiveMQ
-activemq-data/
+# # ActiveMQ
+# activemq-data/
 
-# SageMath parsed files
-*.sage.py
+# # SageMath parsed files
+# *.sage.py
 
 # Environments
 .env
@@ -157,20 +158,20 @@ ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
-.spyderproject
-.spyproject
+# # Spyder project settings
+# .spyderproject
+# .spyproject
 
-# Rope project settings
-.ropeproject
+# # Rope project settings
+# .ropeproject
 
-# mkdocs documentation
-/site
+# # mkdocs documentation
+# /site
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+# # mypy
+# .mypy_cache/
+# .dmypy.json
+# dmypy.json
 
 # Pyre type checker
 .pyre/

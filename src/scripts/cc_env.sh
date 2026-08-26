@@ -1,0 +1,12 @@
+#!/bin/bash
+export CC_TOOLS="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/cc-tools-v2/bin"
+export OE_DIR="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/openeye"
+export OE_LICENSE="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/openeye/etc/oe_license.txt"
+export CACTVS_DIR="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/cactvs/bin"
+export CORINA_DIR="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/corina/bin"
+export BABEL_DIR="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/openbabel-2.2.3/lib"
+export BABEL_DATADIR="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/openbabel-2.2.3/share/openbabel/2.2.3"
+export INCHI_DIR="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/bin"
+export BABEL_LIB="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/openbabel-2.2.3/lib"
+export LOCAL_APPS_LIB="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/lib"
+export LD_LIBRARY_PATH="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/openbabel-2.2.3/lib:/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/lib:${LD_LIBRARY_PATH}"

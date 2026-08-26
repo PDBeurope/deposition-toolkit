@@ -1,0 +1,24 @@
+[project]
+name = "deposition-toolkit"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "onedep-lib>=0.1.0.dev1",
+    "prefect>=3.0.0",
+    "biopython>=1.87",
+    "requests>=2.34.2",
+    "pdbe-sifts>=1.0",
+    "regex>=2026.7.19",
+]
+
+[project.scripts]
+deposition-toolkit = "deposition_toolkit.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
