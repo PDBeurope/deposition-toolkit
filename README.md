@@ -15,6 +15,45 @@ For local source-tree development before installation, this also works:
 python main.py <command> [args]
 ```
 
+## Configuration
+
+Deployment paths and database settings are defined in
+`deposition_toolkit.config.Settings` and loaded with `pydantic-settings`.
+Create your local configuration before running commands:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` for your installation, including the OneDep `CCD_DB_PASSWORD`.
+The local `.env` is ignored by Git. It is read from the directory where you
+launch the command, so launch from the repository root when using its `.env`.
+For installed commands launched elsewhere, put `.env` in the working directory
+or export the settings as environment variables.
+
+Command-line options take precedence over environment variables, which take
+precedence over `.env`, followed by the defaults in `Settings`. Settings are
+validated and cached on first use; restart the command after editing `.env`.
+
+| Setting | Purpose |
+| --- | --- |
+| `UNUSED_CCD_FILE_PATH` | File containing the unused CCD code pool |
+| `CCD_CVS_PATH` | Component dictionary checkout used for allocation checks and CVS commits |
+| `TOOLS_ROOT` | Root for the annotateComp tools and their runtime environment |
+| `ANNOTATE_BIN` | Optional annotateComp executable override; defaults to `<TOOLS_ROOT>/packages/cc-tools-v2/bin/annotateComp` |
+| `DEPOSITION_TOOLKIT_WORKROOT` | Default root for prepared datasets |
+| `DEPOSITION_ROOT` | OneDep deposition root used by the validation report |
+| `CCD_DB_HOST`, `CCD_DB_PORT`, `CCD_DB_USER`, `CCD_DB_PASSWORD`, `CCD_DB_TIMEOUT` | Existing OneDep MySQL connection for CCD finalisation |
+| `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE` | Future toolkit PostgreSQL connection settings |
+
+The PostgreSQL defaults are host `pgsql-hlvm-172`, port `5432`, user `pdb_dep`,
+and password `place-holder`. Leave the database name unset until provisioned.
+These settings are reserved for later use; no PostgreSQL connection is opened.
+
+Python callers can use `from deposition_toolkit.config import get_settings`.
+Passwords use `SecretStr`; call `.get_secret_value()` only when passing a password
+to a database client.
+
 ## Workflow
 
 The intended sequence is:

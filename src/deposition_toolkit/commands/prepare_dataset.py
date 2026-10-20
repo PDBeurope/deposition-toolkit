@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 
-from stages.prepare_dataset.prepare_dataset import (
-    DEFAULT_WORKROOT,
-    prepare_dataset,
-)
+from deposition_toolkit.config import get_settings
+from stages.prepare_dataset.prepare_dataset import prepare_dataset
 
 from .shared import LOGGER
 
@@ -18,7 +15,7 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help="Copy/extract a tarball and create manifests.",
     )
     parser.add_argument("tarball")
-    parser.add_argument("--work-root", default=os.environ.get("DEPOSITION_TOOLKIT_WORKROOT", DEFAULT_WORKROOT))
+    parser.add_argument("--work-root", default=str(get_settings().workroot))
     parser.add_argument("--work-dir")
     parser.add_argument("--no-copy", action="store_true")
     parser.add_argument("--no-extract", action="store_true")

@@ -28,8 +28,8 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
+from deposition_toolkit.config import get_settings
 
-DEPOSITION_ROOT = Path("/nfs/public/services/onedep_gpfs/data/production/deposit")
 PAGE_TITLE = "PDBe interactive validation report"
 PAGE_HEADING = "PDBe Validation Summary"
 PAGE_SUBTITLE = "Deposition Toolkit - Validation summary report"
@@ -809,6 +809,7 @@ render();
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    deposition_root = get_settings().deposition_root.expanduser()
     ap = argparse.ArgumentParser(
         description="Create the self-contained PDBe validation summary dashboard from OneDep deposition IDs."
     )
@@ -821,8 +822,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument(
         "--base-path",
         type=Path,
-        default=DEPOSITION_ROOT,
-        help=f"OneDep deposition root (default: {DEPOSITION_ROOT})",
+        default=deposition_root,
+        help=f"OneDep deposition root (default: {deposition_root})",
     )
     args = ap.parse_args(argv)
 

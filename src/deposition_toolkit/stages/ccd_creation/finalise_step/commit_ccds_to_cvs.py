@@ -12,13 +12,9 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from deposition_toolkit.config import get_settings
 
 logger = logging.getLogger("commit_ccds_to_cvs")
-
-try:
-    from wwpdb.utils.config.ConfigInfoApp import ConfigInfoAppCommon
-except ImportError:
-    ConfigInfoAppCommon = None
 
 
 def setup_logging() -> None:
@@ -68,12 +64,7 @@ def find_ccd_files(folder: Path) -> dict[str, Path]:
 
 
 def resolve_cvs_root(cvs_path: str | None) -> Path:
-    if cvs_path:
-        cvs_root = Path(cvs_path).expanduser().resolve()
-    else:
-        if ConfigInfoAppCommon is None:
-            raise RuntimeError("Provide --cvs_path; OneDep config is not available")
-        cvs_root = Path(ConfigInfoAppCommon().get_site_cc_cvs_path()).expanduser().resolve()
+    cvs_root = Path(cvs_path or get_settings().ccd_cvs_path).expanduser().resolve()
 
     if not cvs_root.is_dir():
         raise FileNotFoundError(f"CVS root does not exist: {cvs_root}")
@@ -193,7 +184,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Copy CCD CIFs into CVS, cvs add, and commit.")
     parser.add_argument("--ccd_folder", required=True, help="Folder containing CCD CIF files.")
     parser.add_argument("--commit_message", required=True, help="CVS commit message.")
-    parser.add_argument("--cvs_path", help="CVS root. Uses OneDep config when omitted.")
+    parser.add_argument("--cvs_path", help="CVS root. Defaults to CCD_CVS_PATH from settings.")
     parser.add_argument("--dry-run", action="store_true", help="Preview actions without changing CVS.")
     return parser.parse_args(argv)
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import shutil
 import sys
 import tarfile
@@ -11,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
+from deposition_toolkit.config import get_settings
 from stages.common.manifest import (
     discover_structure_dirs,
     ensure_manifest,
@@ -20,7 +20,6 @@ from stages.common.manifest import (
 )
 
 
-DEFAULT_WORKROOT = "/nfs/public/services/onedep_gpfs/ccd_creation"
 LOGGER = logging.getLogger("prepare_dataset")
 
 
@@ -96,11 +95,7 @@ def prepare_dataset(
     if not tarball.is_file():
         raise FileNotFoundError(f"Tarball not found: {tarball}")
 
-    root = Path(
-        work_root
-        or os.environ.get("DEPOSITION_TOOLKIT_WORKROOT")
-        or DEFAULT_WORKROOT
-    ).expanduser()
+    root = Path(work_root or get_settings().workroot).expanduser()
     destination = (work_dir.expanduser() if work_dir else default_work_dir(tarball, root)).resolve()
     log_dir = destination / "results" / "logs"
     destination.mkdir(parents=True, exist_ok=True)
@@ -135,7 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("tarball", help="Input .tar/.tgz/.tar.gz dataset.")
     parser.add_argument(
         "--work-root",
-        default=os.environ.get("DEPOSITION_TOOLKIT_WORKROOT", DEFAULT_WORKROOT),
+        default=str(get_settings().workroot),
         help="Root containing the work/ directory.",
     )
     parser.add_argument("--work-dir", help="Explicit destination work directory.")

@@ -11,6 +11,11 @@ dependencies = [
     "requests>=2.34.2",
     "pdbe-sifts>=1.0",
     "regex>=2026.7.19",
+    "reportlab>=5.0.1",
+    "pdbe-mmcif-validator>=0.1.97",
+    "rdkit>=2026.9.1",
+    "mysql-connector-python>=26.7.0",
+    "pydantic-settings>=2.0,<3",
 ]
 
 [project.scripts]

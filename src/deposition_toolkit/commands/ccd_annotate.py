@@ -3,7 +3,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from stages.ccd_creation.annotate_comp import DEFAULT_ANNOTATE, annotate_file
+from deposition_toolkit.config import get_settings
+from stages.ccd_creation.annotate_comp import annotate_file
 from stages.common.manifest import relative_to_work_dir, update_step
 
 from .shared import STEP_CCD_ANNOTATE, relative_outputs, require_structures, results_path
@@ -12,7 +13,7 @@ from .shared import STEP_CCD_ANNOTATE, relative_outputs, require_structures, res
 def register(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("ccd-annotate", help="Annotate stage-1 CCD CIFs with annotateComp.")
     parser.add_argument("work_dir")
-    parser.add_argument("--annotate-bin", default=DEFAULT_ANNOTATE)
+    parser.add_argument("--annotate-bin", default=str(get_settings().annotate_comp_path))
     parser.set_defaults(func=run)
 
 

@@ -11,9 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
+from deposition_toolkit.config import get_settings
 
-DEFAULT_ANNOTATE = "/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/cc-tools-v2/bin/annotateComp"
-TOOLS_ROOT = "/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9"
 ROUND_1_OPS = "stereo-cactvs|aro-cactvs|descriptor-oe|xyz-ideal-corina|xyz-model-h-oe|fix"
 ROUND_2_OPS = "descriptor-cactvs|name-oe|descriptor-inchi|rename"
 LOGGER = logging.getLogger("ccd_annotate")
@@ -32,25 +31,26 @@ class AnnotationResult:
 
 
 def default_environment(base_env: dict[str, str] | None = None) -> dict[str, str]:
+    tools_root = get_settings().tools_root.expanduser()
     env = dict(base_env or os.environ)
     env.update(
         {
-            "CC_TOOLS": f"{TOOLS_ROOT}/packages/cc-tools-v2/bin",
-            "OE_DIR": f"{TOOLS_ROOT}/packages/openeye",
-            "OE_LICENSE": f"{TOOLS_ROOT}/packages/openeye/etc/oe_license.txt",
-            "CACTVS_DIR": f"{TOOLS_ROOT}/packages/cactvs/bin",
-            "CORINA_DIR": f"{TOOLS_ROOT}/packages/corina/bin",
-            "BABEL_DIR": f"{TOOLS_ROOT}/packages/openbabel-2.2.3/lib",
-            "BABEL_DATADIR": f"{TOOLS_ROOT}/packages/openbabel-2.2.3/share/openbabel/2.2.3",
-            "INCHI_DIR": f"{TOOLS_ROOT}/bin",
-            "BABEL_LIB": f"{TOOLS_ROOT}/packages/openbabel-2.2.3/lib",
-            "LOCAL_APPS_LIB": f"{TOOLS_ROOT}/lib",
+            "CC_TOOLS": f"{tools_root}/packages/cc-tools-v2/bin",
+            "OE_DIR": f"{tools_root}/packages/openeye",
+            "OE_LICENSE": f"{tools_root}/packages/openeye/etc/oe_license.txt",
+            "CACTVS_DIR": f"{tools_root}/packages/cactvs/bin",
+            "CORINA_DIR": f"{tools_root}/packages/corina/bin",
+            "BABEL_DIR": f"{tools_root}/packages/openbabel-2.2.3/lib",
+            "BABEL_DATADIR": f"{tools_root}/packages/openbabel-2.2.3/share/openbabel/2.2.3",
+            "INCHI_DIR": f"{tools_root}/bin",
+            "BABEL_LIB": f"{tools_root}/packages/openbabel-2.2.3/lib",
+            "LOCAL_APPS_LIB": f"{tools_root}/lib",
         }
     )
     existing_ld_path = env.get("LD_LIBRARY_PATH", "")
     ld_parts = [
-        f"{TOOLS_ROOT}/packages/openbabel-2.2.3/lib",
-        f"{TOOLS_ROOT}/lib",
+        f"{tools_root}/packages/openbabel-2.2.3/lib",
+        f"{tools_root}/lib",
     ]
     if existing_ld_path:
         ld_parts.append(existing_ld_path)
@@ -103,13 +103,13 @@ def annotate_file(
     input_file: Path,
     output_file: Path,
     *,
-    annotate_bin: Path = Path(DEFAULT_ANNOTATE),
+    annotate_bin: Path | None = None,
     log_dir: Path,
     env: dict[str, str] | None = None,
 ) -> AnnotationResult:
     input_file = input_file.resolve()
     output_file = output_file.resolve()
-    annotate_bin = annotate_bin.expanduser()
+    annotate_bin = (annotate_bin or get_settings().annotate_comp_path).expanduser()
     structure_id = input_file.parent.name
     output_file.parent.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -197,7 +197,7 @@ def annotate_tree(
     input_root: Path,
     output_root: Path,
     *,
-    annotate_bin: Path = Path(DEFAULT_ANNOTATE),
+    annotate_bin: Path | None = None,
     log_root: Path,
 ) -> list[AnnotationResult]:
     input_root = input_root.resolve()
@@ -223,7 +223,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("input_root", help="Root containing structure folders of stage-1 CCD CIFs.")
     parser.add_argument("output_root", help="Root for annotated stage-2 CCD CIFs.")
     parser.add_argument("--log-root", required=True, help="Root for annotateComp stdout/stderr logs.")
-    parser.add_argument("--annotate-bin", default=DEFAULT_ANNOTATE, help="Path to annotateComp.")
+    parser.add_argument("--annotate-bin", default=str(get_settings().annotate_comp_path), help="Path to annotateComp.")
     return parser
 
 

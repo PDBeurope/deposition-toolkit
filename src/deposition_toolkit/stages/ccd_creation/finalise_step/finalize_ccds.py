@@ -13,7 +13,6 @@ import argparse
 import csv
 import json
 import logging
-import os
 import shlex
 import subprocess
 import sys
@@ -23,11 +22,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from deposition_toolkit.config import get_settings
 
-DB_HOST = "mysql-pdbe-onedep-prod.ebi.ac.uk"
-DB_PORT = 4437
-DB_USER = "pdberead"
-DB_PASSWORD = "pdberead55"
 DB_QUERY = (
     "SELECT comp_id, descriptor "
     "FROM compv4.pdbx_chem_comp_descriptor "
@@ -219,6 +215,8 @@ def read_existing_descriptor_file(path: Path) -> dict[str, set[str]]:
 
 
 def query_existing_descriptors(args: argparse.Namespace) -> dict[str, set[str]]:
+    if not args.db_password:
+        raise RuntimeError("Set CCD_DB_PASSWORD in .env or the environment, or pass --db-password.")
     try:
         import mysql.connector
     except ImportError as exc:
@@ -792,6 +790,7 @@ def run_commit_only(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    settings = get_settings()
     parser = argparse.ArgumentParser(
         description="Finalize annotated CCD CIFs and optionally invoke CVS commit.",
     )
@@ -867,11 +866,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Only run the CVS helper against --commit-folder; skip scanning and DB checks.",
     )
-    parser.add_argument("--db-host", default=os.environ.get("CCD_DB_HOST", DB_HOST))
-    parser.add_argument("--db-port", type=int, default=int(os.environ.get("CCD_DB_PORT", DB_PORT)))
-    parser.add_argument("--db-user", default=os.environ.get("CCD_DB_USER", DB_USER))
-    parser.add_argument("--db-password", default=os.environ.get("CCD_DB_PASSWORD", DB_PASSWORD))
-    parser.add_argument("--db-timeout", type=int, default=int(os.environ.get("CCD_DB_TIMEOUT", "30")))
+    parser.add_argument("--db-host", default=settings.ccd_db_host)
+    parser.add_argument("--db-port", type=int, default=settings.ccd_db_port)
+    parser.add_argument("--db-user", default=settings.ccd_db_user)
+    parser.add_argument("--db-password", default=settings.ccd_db_password.get_secret_value())
+    parser.add_argument("--db-timeout", type=int, default=settings.ccd_db_timeout)
     parser.add_argument("--debug", action="store_true", help="Enable debug logging.")
     return parser
 

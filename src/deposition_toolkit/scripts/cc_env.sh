@@ -9,4 +9,4 @@ export BABEL_DATADIR="/nfs/public/services/onedep_gpfs/resources/tools/tools-cen
 export INCHI_DIR="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/bin"
 export BABEL_LIB="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/openbabel-2.2.3/lib"
 export LOCAL_APPS_LIB="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/lib"
-export LD_LIBRARY_PATH="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/openbabel-2.2.3/lib:/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/lib:${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/packages/openbabel-2.2.3/lib:/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9/lib:${LD_LIBRARY_PATH:-}"

@@ -6,8 +6,6 @@ Reads a file of pre-allocated unused codes, checks each against the
 chemical component sandbox to find the first one not yet in use,
 then removes checked codes from the file.
 
-Minimal dependencies: only needs wwpdb.utils.config and wwpdb.io.locator.
-
 Usage:
     python get_new_ccd_code.py                  # just print the next code
     python get_new_ccd_code.py --dry-run        # don't modify the file
@@ -17,15 +15,28 @@ Usage:
 import os
 import sys
 
+from deposition_toolkit.config import get_settings
+
+
+def get_ccd_path(ccd_id: str) -> str | None:
+    """Returns full path to the CCD"""
+    if not ccd_id:
+        return None
+    ccd_id = ccd_id.upper()
+
+    if len(ccd_id) > 3:
+        hash_key = ccd_id.upper()[-2:]
+    elif len(ccd_id) > 0:
+        hash_key = ccd_id.upper()[0]
+    else:
+        hash_key = ""
+
+    file_path = os.path.join(get_settings().ccd_cvs_path.expanduser(), hash_key, ccd_id, f"{ccd_id}.cif")
+
+    return file_path
 
 def get_next_unused_code(site_id="PDBE_PROD", dry_run=False, verbose=False):
-    from wwpdb.utils.config.ConfigInfoApp import ConfigInfoAppCommon
-    from wwpdb.utils.config.ConfigInfo import ConfigInfo
-    from wwpdb.io.locator.ChemRefPathInfo import ChemRefPathInfo
-
-    # Get the file path containing unused codes
-    ci_app = ConfigInfoAppCommon(siteId=site_id)
-    file_path = ci_app.get_unused_ccd_file()
+    file_path = get_settings().unused_ccd_file_path.expanduser()
 
     if not os.path.isfile(file_path):
         print(f"ERROR: Unused CCD file not found: {file_path}", file=sys.stderr)
@@ -39,24 +50,13 @@ def get_next_unused_code(site_id="PDBE_PROD", dry_run=False, verbose=False):
         print(f"Unused CCD file: {file_path}", file=sys.stderr)
         print(f"Codes in file: {len(all_codes)}", file=sys.stderr)
 
-    # Set up ChemRefPathInfo to check if a component already exists in the
-    # CVS sandbox. The sandbox is a local checkout of the CVS repository that
-    # holds all CCD component CIF files — both released and in-progress.
-    # This check is essential because a code may not yet be in the public CCD
-    # but could already be assigned by another annotator working in parallel.
-    # Without this check, two annotators could end up using the same code.
-    ci = ConfigInfo(siteId=site_id)
-    crpi = ChemRefPathInfo(configObj=ci)
-
-    # Walk through the list of candidate codes and check each one against
-    # the sandbox. crpi.getFilePath(ccId, "CC") returns the expected local
     # file path for that component (e.g. /path/to/sandbox/A/ATP/ATP.cif).
     # If the file exists on disk, that code is already taken — skip it.
     # The first code whose file does NOT exist is available for use.
     code = ""
     idx = 0
     for idx, cc_id in enumerate(all_codes, start=1):
-        component_path = crpi.getFilePath(cc_id, "CC")
+        component_path = get_ccd_path(cc_id)
         exists = os.path.isfile(component_path) if component_path else False
 
         if verbose:
