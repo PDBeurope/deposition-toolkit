@@ -4,7 +4,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from stages.common.manifest import find_matching_files, relative_to_work_dir, update_step
+from deposition_toolkit.stages.common.manifest import find_matching_files, relative_to_work_dir, update_step
 
 from .shared import (
     STEP_RESOLUTION_CLEANUP,
@@ -31,7 +31,7 @@ def register(subparsers: argparse._SubParsersAction) -> None:
 
 
 def run(args: argparse.Namespace) -> int:
-    from stages.resolution_cleanup import resolution_cleanup
+    from deposition_toolkit.stages.resolution_cleanup import resolution_cleanup
 
     work_dir = Path(args.work_dir).resolve()
     structure_dirs = require_structures(work_dir, STEP_RESOLUTION_CLEANUP)

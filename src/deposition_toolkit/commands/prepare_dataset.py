@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from deposition_toolkit.config import get_settings
-from stages.prepare_dataset.prepare_dataset import prepare_dataset
+from deposition_toolkit.stages.prepare_dataset.prepare_dataset import prepare_dataset
 
 from .shared import LOGGER
 

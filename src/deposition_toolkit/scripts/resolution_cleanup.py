@@ -9,7 +9,7 @@ SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from stages.resolution_cleanup.resolution_cleanup import main
+from deposition_toolkit.stages.resolution_cleanup.resolution_cleanup import main
 
 
 if __name__ == "__main__":

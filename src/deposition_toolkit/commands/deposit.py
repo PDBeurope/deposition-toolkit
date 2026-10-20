@@ -4,8 +4,8 @@ import argparse
 import os
 from pathlib import Path
 
-from stages.common.manifest import relative_to_work_dir, set_top_level_fields, update_step
-from stages.deposit.deposition import LOGGER as DEPOSITION_LOGGER, deposit_structure
+from deposition_toolkit.stages.common.manifest import relative_to_work_dir, set_top_level_fields, update_step
+from deposition_toolkit.stages.deposit.deposition import LOGGER as DEPOSITION_LOGGER, deposit_structure
 
 from .shared import (
     STEP_DEPOSITION,

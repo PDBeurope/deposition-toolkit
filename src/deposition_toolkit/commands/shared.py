@@ -9,7 +9,7 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
-from stages.common.manifest import (
+from deposition_toolkit.stages.common.manifest import (
     discover_structure_dirs,
     is_excluded,
     relative_to_work_dir,

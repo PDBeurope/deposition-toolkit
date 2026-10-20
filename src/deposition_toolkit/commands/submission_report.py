@@ -5,7 +5,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Sequence
 
-from stages.common.manifest import relative_to_work_dir, set_top_level_fields, update_step
+from deposition_toolkit.stages.common.manifest import relative_to_work_dir, set_top_level_fields, update_step
 
 from .shared import (
     STEP_SUBMISSION_REPORT,
@@ -33,7 +33,7 @@ def scan_structures_for_report(dep_report: ModuleType, structure_dirs: Sequence[
 
 
 def run(args: argparse.Namespace) -> int:
-    from stages.prepare_dataset import dep_report
+    from deposition_toolkit.stages.prepare_dataset import dep_report
 
     work_dir = Path(args.work_dir).resolve()
     structure_dirs = require_structures(work_dir, STEP_SUBMISSION_REPORT)

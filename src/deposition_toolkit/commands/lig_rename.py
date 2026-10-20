@@ -3,8 +3,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from stages.ccd_creation.ligand_renaming import lig_renaming
-from stages.common.manifest import relative_to_work_dir, update_step
+from deposition_toolkit.stages.ccd_creation.ligand_renaming import lig_renaming
+from deposition_toolkit.stages.common.manifest import relative_to_work_dir, update_step
 
 from .shared import STEP_LIG_RENAME, LOGGER, relative_outputs, require_structures, results_path
 

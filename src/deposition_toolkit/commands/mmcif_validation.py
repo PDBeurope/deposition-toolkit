@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from stages.common.manifest import relative_to_work_dir, update_step
+from deposition_toolkit.stages.common.manifest import relative_to_work_dir, update_step
 
 from .shared import STEP_MMCIF_VALIDATION, LOGGER, require_structures, results_path
 
@@ -29,7 +29,7 @@ def run(args: argparse.Namespace) -> int:
             update_step(structure_dir, STEP_MMCIF_VALIDATION, "failed", error=error)
         return 2
 
-    from stages.validate import mmcif_validate
+    from deposition_toolkit.stages.validate import mmcif_validate
 
     log_dir = results_path(work_dir, "logs", "mmcif_validation")
     any_failed = False

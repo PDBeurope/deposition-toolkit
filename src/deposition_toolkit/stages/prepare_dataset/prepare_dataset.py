@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Sequence
 
 from deposition_toolkit.config import get_settings
-from stages.common.manifest import (
+from deposition_toolkit.stages.common.manifest import (
     discover_structure_dirs,
     ensure_manifest,
     find_matching_files,

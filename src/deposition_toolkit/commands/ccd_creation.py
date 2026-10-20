@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from stages.common.manifest import relative_to_work_dir, update_step
+from deposition_toolkit.stages.common.manifest import relative_to_work_dir, update_step
 
 from .shared import (
     STEP_CCD_CREATION,
@@ -21,7 +21,7 @@ def register(subparsers: argparse._SubParsersAction) -> None:
 
 
 def run(args: argparse.Namespace) -> int:
-    from stages.ccd_creation.ccd_creator import CcdDirectoryBuilder, LOGGER as CCD_CREATOR_LOGGER
+    from deposition_toolkit.stages.ccd_creation.ccd_creator import CcdDirectoryBuilder, LOGGER as CCD_CREATOR_LOGGER
 
     work_dir = Path(args.work_dir).resolve()
     structure_dirs = require_structures(work_dir, STEP_CCD_CREATION)

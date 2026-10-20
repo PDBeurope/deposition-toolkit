@@ -4,7 +4,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from stages.common.manifest import (
+from deposition_toolkit.stages.common.manifest import (
     find_coordinate_files,
     relative_to_work_dir,
     set_top_level_fields,
@@ -22,7 +22,7 @@ def register(subparsers: argparse._SubParsersAction) -> None:
 
 
 def run(args: argparse.Namespace) -> int:
-    from stages.analyse_chains import analysis_polymer_chains
+    from deposition_toolkit.stages.analyse_chains import analysis_polymer_chains
 
     work_dir = Path(args.work_dir).resolve()
     structure_dirs = require_structures(work_dir, STEP_ANALYSE_CHAINS)

@@ -4,8 +4,8 @@ import argparse
 from pathlib import Path
 
 from deposition_toolkit.config import get_settings
-from stages.ccd_creation.annotate_comp import annotate_file
-from stages.common.manifest import relative_to_work_dir, update_step
+from deposition_toolkit.stages.ccd_creation.annotate_comp import annotate_file
+from deposition_toolkit.stages.common.manifest import relative_to_work_dir, update_step
 
 from .shared import STEP_CCD_ANNOTATE, relative_outputs, require_structures, results_path
 

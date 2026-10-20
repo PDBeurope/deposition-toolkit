@@ -11,10 +11,11 @@ from unittest.mock import patch
 from pydantic import ValidationError
 
 from deposition_toolkit.config import Settings, get_settings
-from stages.ccd_creation import annotate_comp
-from stages.ccd_creation.finalise_step import commit_ccds_to_cvs, finalize_ccds, get_new_ccd_code
-from stages.prepare_dataset import prepare_dataset
-from stages.validation_report import val_report
+from deposition_toolkit.stages.ccd_creation import annotate_comp
+from deposition_toolkit.stages.ccd_creation.finalise_step import commit_ccds_to_cvs, finalize_ccds
+from deposition_toolkit.stages.ccd_creation.finalise_step import get_new_ccd_code
+from deposition_toolkit.stages.prepare_dataset import prepare_dataset
+from deposition_toolkit.stages.validation_report import val_report
 
 
 @contextmanager

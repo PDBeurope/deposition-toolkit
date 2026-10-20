@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from stages.common.manifest import find_coordinate_files, update_step
+from deposition_toolkit.stages.common.manifest import find_coordinate_files, update_step
 
 from .shared import STEP_METADATA_ENRICHMENT, LOGGER, relative_outputs, require_structures, results_path
 
@@ -29,7 +29,7 @@ def run(args: argparse.Namespace) -> int:
     if not structure_dirs:
         return 1
 
-    from stages.metadata_enrichment.enrich_cif import enrich_cif_file
+    from deposition_toolkit.stages.metadata_enrichment.enrich_cif import enrich_cif_file
 
     log_dir = results_path(work_dir, "logs", "metadata_enrichment")
     dictionary_path = None if args.skip_validation else Path(args.dictionary).expanduser().resolve()

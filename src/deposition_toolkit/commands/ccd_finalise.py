@@ -6,7 +6,7 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 
-from stages.common.manifest import update_step
+from deposition_toolkit.stages.common.manifest import update_step
 
 from .shared import (
     STEP_CCD_FINALISE,
@@ -76,7 +76,7 @@ def finalizer_argv(args: argparse.Namespace, final_dir: Path) -> list[str]:
 
 
 def run(args: argparse.Namespace) -> int:
-    from stages.ccd_creation.finalise_step import finalize_ccds
+    from deposition_toolkit.stages.ccd_creation.finalise_step import finalize_ccds
 
     work_dir = Path(args.work_dir).resolve()
     structure_dirs = require_structures(work_dir, STEP_CCD_FINALISE)
