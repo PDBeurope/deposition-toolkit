@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from deposition_toolkit.config import get_settings
 from deposition_toolkit.stages.common.manifest import find_coordinate_files, update_step
 
 from .shared import STEP_METADATA_ENRICHMENT, LOGGER, relative_outputs, require_structures, results_path
@@ -13,7 +14,7 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("work_dir")
     parser.add_argument("metadata_json")
     parser.add_argument("--entry-id", default="model")
-    parser.add_argument("--dictionary", default="./mmcif_pdbx_v50.dic")
+    parser.add_argument("--dictionary", default=str(get_settings().mmcif_dictionary_path))
     parser.add_argument("--skip-validation", action="store_true")
     parser.set_defaults(func=run)
 
@@ -39,6 +40,7 @@ def run(args: argparse.Namespace) -> int:
         outputs: list[Path] = []
         errors: list[str] = []
         validation_errors = 0
+        validation_warnings = 0
         if not coordinate_files:
             errors.append("No coordinate CIF files found.")
         for cif_path in coordinate_files:
@@ -53,7 +55,10 @@ def run(args: argparse.Namespace) -> int:
                     validation_log_path=validation_log,
                 )
                 outputs.append(Path(result["output_cif"]))
+                if result.get("validation_log"):
+                    outputs.append(Path(result["validation_log"]))
                 validation_errors += int(result.get("validation_errors", 0))
+                validation_warnings += int(result.get("validation_warnings", 0))
             except BaseException as exc:
                 errors.append(f"{cif_path.name}: {type(exc).__name__}: {exc}")
 
@@ -65,6 +70,9 @@ def run(args: argparse.Namespace) -> int:
             status,
             outputs=relative_outputs(outputs, work_dir),
             error="; ".join(errors) if errors else None,
-            extra={"validation_errors": validation_errors},
+            extra={
+                "validation_errors": validation_errors,
+                "validation_warnings": validation_warnings,
+            },
         )
     return 1 if any_failed else 0

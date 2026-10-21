@@ -4,12 +4,14 @@ import argparse
 import json
 import logging
 from pathlib import Path
+from types import EllipsisType
 from typing import Any, Dict, List, Sequence, Tuple
 import gemmi
 from Bio import Align
 import requests
 import time
 from datetime import datetime, timedelta
+from deposition_toolkit.config import get_settings
 # from pdbe_sifts.mmcif.curator.cif_sequence_update import CifSequenceUpdater
 
 
@@ -342,7 +344,7 @@ def parse_args():
     )
     parser.add_argument(
         "--dictionary",
-        default="./mmcif_pdbx_v50.dic",
+        default=str(get_settings().mmcif_dictionary_path),
         help="Path to the mmCIF dictionary used for output validation.",
     )
     parser.add_argument(
@@ -653,9 +655,10 @@ def enrich_cif_file(
     output_cif: Path | None = None,
     *,
     entry_id: str = "model",
-    dictionary_path: Path | None = Path("./mmcif_pdbx_v50.dic"),
+    dictionary_path: Path | None | EllipsisType = ...,
     validation_log_path: Path | None = None,
 ) -> dict[str, Any]:
+    """Enrich a CIF, using the configured dictionary unless None disables validation."""
     input_cif = Path(input_cif)
     input_json = Path(input_json)
     output_cif = Path(output_cif or input_cif)
@@ -686,13 +689,16 @@ def enrich_cif_file(
     }
     if dictionary_path is None:
         return result
+    if dictionary_path is Ellipsis:
+        dictionary_path = get_settings().mmcif_dictionary_path
 
     validation_log_path = validation_log_path or output_cif.with_name(
         f"{output_cif.stem}_validation_errors.txt"
     )
+    validation_log_path.parent.mkdir(parents=True, exist_ok=True)
     from validate_mmcif import validate
 
-    errors = list(validate(Path(dictionary_path), Path(output_cif)))
+    errors = list(validate(Path(dictionary_path).expanduser(), Path(output_cif)))
     severity_has_error = False
     error_count = 0
     warning_count = 0
@@ -746,7 +752,7 @@ def parse_args_from(argv: Sequence[str]):
     parser.add_argument("--input-json", required=True, help="Path to JSON metadata file")
     parser.add_argument("--output-cif", required=True, help="Path to write enriched mmCIF file")
     parser.add_argument("--entry-id", default="model", help="Entry ID for output CIF file (default: model)")
-    parser.add_argument("--dictionary", default="./mmcif_pdbx_v50.dic", help="Path to the mmCIF dictionary used for output validation.")
+    parser.add_argument("--dictionary", default=str(get_settings().mmcif_dictionary_path), help="Path to the mmCIF dictionary used for output validation.")
     parser.add_argument("--validation-log", help="Path for validation errors. Defaults to <output-stem>_validation_errors.txt.")
     parser.add_argument("--skip-validation", action="store_true", help="Write the enriched file without running validate_mmcif.")
     return parser.parse_args(argv)

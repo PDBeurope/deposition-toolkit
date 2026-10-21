@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     deposition_root: Path = Path(
         "/nfs/public/services/onedep_gpfs/data/production/deposit"
     )
+    mmcif_dictionary_path: Path = Path(
+        "/nfs/public/services/onedep_gpfs/deposition-toolkit-processing/mmcif_pdbx_v50.dic"
+    )
 
     ccd_db_host: str = "mysql-pdbe-onedep-prod.ebi.ac.uk"
     ccd_db_port: int = Field(default=4437, ge=1, le=65535)

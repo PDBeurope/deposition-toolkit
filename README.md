@@ -43,6 +43,7 @@ validated and cached on first use; restart the command after editing `.env`.
 | `ANNOTATE_BIN` | Optional annotateComp executable override; defaults to `<TOOLS_ROOT>/packages/cc-tools-v2/bin/annotateComp` |
 | `DEPOSITION_TOOLKIT_WORKROOT` | Default root for prepared datasets |
 | `DEPOSITION_ROOT` | OneDep deposition root used by the validation report |
+| `MMCIF_DICTIONARY_PATH` | Default mmCIF dictionary for validation and metadata enrichment; defaults to `/nfs/public/services/onedep_gpfs/deposition-toolkit-processing/mmcif_pdbx_v50.dic` |
 | `CCD_DB_HOST`, `CCD_DB_PORT`, `CCD_DB_USER`, `CCD_DB_PASSWORD`, `CCD_DB_TIMEOUT` | Existing OneDep MySQL connection for CCD finalisation |
 | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE` | Future toolkit PostgreSQL connection settings |
 
@@ -134,8 +135,7 @@ Run mmCIF validation:
 
 ```bash
 uv run deposition-toolkit mmcif-validation \
-  /path/to/work-dir \
-  --dictionary /path/to/mmcif_pdbx_v50.dic
+  /path/to/work-dir
 ```
 
 Enrich coordinate CIFs in place from metadata JSON:
@@ -143,9 +143,11 @@ Enrich coordinate CIFs in place from metadata JSON:
 ```bash
 uv run deposition-toolkit enrich-metadata \
   /path/to/work-dir \
-  /path/to/metadata.json \
-  --dictionary /path/to/mmcif_pdbx_v50.dic
+  /path/to/metadata.json
 ```
+
+Both commands use `MMCIF_DICTIONARY_PATH` from the shared settings. Pass
+`--dictionary /path/to/other.dic` to override it for a single run.
 
 Create, annotate, and finalize CCDs:
 

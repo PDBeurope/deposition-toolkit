@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from deposition_toolkit.config import get_settings
 from deposition_toolkit.stages.common.manifest import relative_to_work_dir, update_step
 
 from .shared import STEP_MMCIF_VALIDATION, LOGGER, require_structures, results_path
@@ -11,7 +12,7 @@ from .shared import STEP_MMCIF_VALIDATION, LOGGER, require_structures, results_p
 def register(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("mmcif-validation", help="Validate mmCIF files per structure.")
     parser.add_argument("work_dir")
-    parser.add_argument("--dictionary", "-d", default="./mmcif_pdbx_v50.dic")
+    parser.add_argument("--dictionary", "-d", default=str(get_settings().mmcif_dictionary_path))
     parser.set_defaults(func=run)
 
 

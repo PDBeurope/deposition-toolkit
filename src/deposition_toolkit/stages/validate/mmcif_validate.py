@@ -11,6 +11,7 @@ from typing import Iterable, Sequence
 
 from validate_mmcif import validate
 
+from deposition_toolkit.config import get_settings
 
 logger = logging.getLogger("mmcif_validate")
 
@@ -33,8 +34,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-d",
         "--dictionary",
-        default="./mmcif_pdbx_v50.dic",
-        help="Path to the mmCIF dictionary file. Defaults to ./mmcif_pdbx_v50.dic.",
+        default=str(get_settings().mmcif_dictionary_path),
+        help="Path to the mmCIF dictionary file. Defaults to MMCIF_DICTIONARY_PATH from settings.",
     )
     parser.add_argument(
         "-l",
@@ -189,7 +190,7 @@ def main() -> int:
     )
 
     args = parse_args()
-    dictionary_path = Path(args.dictionary)
+    dictionary_path = Path(args.dictionary).expanduser()
     log_dir = Path(args.log_dir)
 
     if not dictionary_path.is_file():

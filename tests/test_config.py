@@ -2,11 +2,12 @@
 
 import argparse
 import os
+import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import DEFAULT, patch
 
 from pydantic import ValidationError
 
@@ -43,6 +44,7 @@ class SettingsTests(unittest.TestCase):
             "ANNOTATE_BIN=/custom/annotateComp\n"
             "DEPOSITION_TOOLKIT_WORKROOT=/custom/work\n"
             "DEPOSITION_ROOT=/custom/deposit\n"
+            "MMCIF_DICTIONARY_PATH=/custom/mmcif.dic\n"
             "CCD_DB_HOST=custom-mysql\nCCD_DB_PORT=4406\nCCD_DB_USER=reader\n"
             "CCD_DB_PASSWORD='test-secret'\nCCD_DB_TIMEOUT=12\n"
             "POSTGRES_HOST=custom-pg\nPOSTGRES_PORT=5433\nPOSTGRES_USER=writer\n"
@@ -56,6 +58,7 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(settings.annotate_comp_path, Path("/custom/annotateComp"))
             self.assertEqual(settings.workroot, Path("/custom/work"))
             self.assertEqual(settings.deposition_root, Path("/custom/deposit"))
+            self.assertEqual(settings.mmcif_dictionary_path, Path("/custom/mmcif.dic"))
             self.assertEqual((settings.ccd_db_host, settings.ccd_db_port, settings.ccd_db_user),
                              ("custom-mysql", 4406, "reader"))
             self.assertEqual(settings.ccd_db_timeout, 12)
@@ -68,10 +71,12 @@ class SettingsTests(unittest.TestCase):
             self.assertNotIn("test-pg-secret", settings.model_dump_json())
 
     def test_environment_overrides_dotenv(self):
-        with configured_directory("CCD_DB_PORT=4406\nDEPOSITION_TOOLKIT_WORKROOT=/dotenv\n"):
-            with patch.dict(os.environ, {"CCD_DB_PORT": "4407", "DEPOSITION_TOOLKIT_WORKROOT": "/env"}):
+        with configured_directory("CCD_DB_PORT=4406\nDEPOSITION_TOOLKIT_WORKROOT=/dotenv\nMMCIF_DICTIONARY_PATH=/dotenv.dic\n"):
+            with patch.dict(os.environ, {"CCD_DB_PORT": "4407", "DEPOSITION_TOOLKIT_WORKROOT": "/env",
+                                         "MMCIF_DICTIONARY_PATH": "/env.dic"}):
                 self.assertEqual(get_settings().ccd_db_port, 4407)
                 self.assertEqual(get_settings().workroot, Path("/env"))
+                self.assertEqual(get_settings().mmcif_dictionary_path, Path("/env.dic"))
 
     def test_defaults_work_without_dotenv_and_do_not_connect(self):
         with configured_directory("") as root:
@@ -83,6 +88,8 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(settings.postgres_port, 5432)
             self.assertIsNone(settings.postgres_database)
             self.assertEqual(settings.ccd_db_password.get_secret_value(), "")
+            self.assertEqual(settings.mmcif_dictionary_path, Path(
+                "/nfs/public/services/onedep_gpfs/deposition-toolkit-processing/mmcif_pdbx_v50.dic"))
             self.assertEqual(settings.annotate_comp_path,
                              settings.tools_root / "packages/cc-tools-v2/bin/annotateComp")
 
@@ -110,6 +117,55 @@ class SettingsTests(unittest.TestCase):
 
 
 class StageConfigurationTests(unittest.TestCase):
+    def test_dictionary_defaults_and_overrides_across_command_and_stage_parsers(self):
+        from deposition_toolkit.commands import enrich_metadata, mmcif_validation
+        from deposition_toolkit.stages.metadata_enrichment import enrich_cif
+        from deposition_toolkit.stages.validate import mmcif_validate
+
+        with configured_directory("MMCIF_DICTIONARY_PATH=/configured/mmcif.dic\n"):
+            parser = argparse.ArgumentParser()
+            subparsers = parser.add_subparsers()
+            enrich_metadata.register(subparsers)
+            mmcif_validation.register(subparsers)
+            enrich_args = ["--input-cif", "in.cif", "--input-json", "meta.json", "--output-cif", "out.cif"]
+            cases = [
+                (parser.parse_args, ["mmcif-validation", "work"]),
+                (parser.parse_args, ["enrich-metadata", "work", "meta.json"]),
+                (enrich_cif.parse_args_from, enrich_args),
+                (lambda argv: enrich_cif.parse_args(), enrich_args),
+                (lambda argv: mmcif_validate.parse_args(), ["in.cif"]),
+            ]
+            for parse, argv in cases:
+                for extra, expected in (([], "/configured/mmcif.dic"),
+                                        (["--dictionary", "/override.dic"], "/override.dic")):
+                    with self.subTest(argv=argv, extra=extra), patch.object(sys, "argv", ["stage"] + argv + extra):
+                        self.assertEqual(parse(argv + extra).dictionary, expected)
+
+    def test_enrichment_api_resolves_config_at_call_time_and_preserves_skip_validation(self):
+        from deposition_toolkit.stages.metadata_enrichment import enrich_cif
+
+        with configured_directory("MMCIF_DICTIONARY_PATH=/configured/mmcif.dic\n") as root:
+            metadata = root / "meta.json"
+            metadata.write_text("{}")
+            for kwargs, expected in (({}, Path("/configured/mmcif.dic")),
+                                     ({"dictionary_path": Path("/override.dic")}, Path("/override.dic")),
+                                     ({"dictionary_path": None}, None)):
+                with (
+                    self.subTest(kwargs=kwargs),
+                    patch.object(enrich_cif.gemmi.cif, "read_file"),
+                    patch.multiple(enrich_cif, CifDataStorage=DEFAULT, normalize_entry_id=DEFAULT,
+                                   normalize_ids=DEFAULT, enrich_from_json=DEFAULT, enrich_chem_comp=DEFAULT),
+                    patch("validate_mmcif.validate", return_value=[]) as validate,
+                ):
+                    output = root / "out.cif"
+                    result = enrich_cif.enrich_cif_file(root / "in.cif", metadata, output, **kwargs)
+                    if expected is None:
+                        validate.assert_not_called()
+                        self.assertNotIn("validation_errors", result)
+                    else:
+                        validate.assert_called_once_with(expected, output)
+                        self.assertEqual(result["validation_errors"], 0)
+
     def test_allocation_checks_and_commit_use_the_same_configured_checkout(self):
         with configured_directory("UNUSED_CCD_FILE_PATH=unused.lst\nCCD_CVS_PATH=cvs\n") as root:
             used = root / "cvs" / "A" / "ATP" / "ATP.cif"
