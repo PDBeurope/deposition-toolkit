@@ -15,7 +15,7 @@ from .shared import (
 
 
 def register(subparsers: argparse._SubParsersAction) -> None:
-    parser = subparsers.add_parser("ccd-creation", help="Create stage-1 CCD CIFs per structure.")
+    parser = subparsers.add_parser("ccd-creation", help="Stage 1: Create CCD CIFs per structure.")
     parser.add_argument("work_dir")
     parser.set_defaults(func=run)
 

@@ -68,7 +68,7 @@ The intended sequence is:
 7. `ccd-annotate`
 8. `ccd-finalise`
 9. `lig-rename`
-10. `resolution_cleanup`
+10. `resolution-cleanup`
 11. `deposit`
 
 Each structure directory has a `manifest.json` that records top-level state and
@@ -109,7 +109,7 @@ records the step as `not applicable`.
 | `ccd-annotate <work-dir>` | `deposition_toolkit.commands.ccd_annotate` | `stages.ccd_creation.annotate_comp` |
 | `ccd-finalise <work-dir>` | `deposition_toolkit.commands.ccd_finalise` | `stages.ccd_creation.finalise_step.finalize_ccds` |
 | `lig-rename <work-dir>` | `deposition_toolkit.commands.lig_rename` | `stages.ccd_creation.ligand_renaming.lig_renaming` |
-| `resolution_cleanup <work-dir>` | `deposition_toolkit.commands.resolution_cleanup` | `stages.resolution_cleanup.resolution_cleanup` |
+| `resolution-cleanup <work-dir>` | `deposition_toolkit.commands.resolution_cleanup` | `stages.resolution_cleanup.resolution_cleanup` |
 | `deposit <work-dir>` | `deposition_toolkit.commands.deposit` | `stages.deposit.deposition` |
 
 Each command module owns its own argument parser and runner. The top-level CLI in
@@ -172,7 +172,7 @@ uv run deposition-toolkit lig-rename /path/to/work-dir
 Clean up resolution values:
 
 ```bash
-uv run deposition-toolkit resolution_cleanup /path/to/work-dir --pattern '*_struc.cif'
+uv run deposition-toolkit resolution-cleanup /path/to/work-dir --pattern '*_struc.cif'
 ```
 
 Deposit active structures:

@@ -16,8 +16,7 @@ from .shared import (
 
 def register(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser(
-        "resolution_cleanup",
-        aliases=["resolution-cleanup"],
+        "resolution-cleanup",
         help="Clean up resolution/statistics values in coordinate CIFs.",
     )
     parser.add_argument("work_dir")

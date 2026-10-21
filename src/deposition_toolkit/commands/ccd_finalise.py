@@ -19,7 +19,7 @@ from .shared import (
 
 
 def register(subparsers: argparse._SubParsersAction) -> None:
-    parser = subparsers.add_parser("ccd-finalise", help="Finalize annotated CCDs.")
+    parser = subparsers.add_parser("ccd-finalise", help="Stage 3: Finalize annotated CCD. Allocate CCD ID, Commit to CVS")
     parser.add_argument("work_dir")
     parser.add_argument("--existing-descriptors-file")
     parser.add_argument("--write-db-cache")

@@ -11,7 +11,7 @@ from .shared import STEP_CCD_ANNOTATE, relative_outputs, require_structures, res
 
 
 def register(subparsers: argparse._SubParsersAction) -> None:
-    parser = subparsers.add_parser("ccd-annotate", help="Annotate stage-1 CCD CIFs with annotateComp.")
+    parser = subparsers.add_parser("ccd-annotate", help="Stage 2: Create CCD CIFs with annotateComp from stage 1 data.")
     parser.add_argument("work_dir")
     parser.add_argument("--annotate-bin", default=str(get_settings().annotate_comp_path))
     parser.set_defaults(func=run)
