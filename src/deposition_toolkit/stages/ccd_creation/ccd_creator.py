@@ -13,6 +13,8 @@ from pathlib import Path
 
 import gemmi
 
+from deposition_toolkit.stages.common.manifest import set_top_level_fields
+
 try:
     from .rdkit_ligand import RdkitLigandAnalysis, analyze_ligand
 except ImportError:  # pragma: no cover - keeps direct script execution working.
@@ -25,6 +27,13 @@ AUDIT_ACTION_TYPE = "Create component"
 AUDIT_PROCESSING_SITE = "PDBE"
 AUDIT_ANNOTATOR = "GE"
 AUDIT_DETAILS = "Created for OpenBind"
+
+INSTANCE_FIELDS = (
+    "label_alt_id", "label_comp_id", "label_asym_id", "label_entity_id",
+    "label_seq_id", "pdbx_PDB_ins_code", "auth_seq_id", "auth_asym_id",
+    "pdbx_PDB_model_num",
+)
+
 
 class CifProcessingError(RuntimeError):
     """Raised when the input data does not satisfy the expected constraints."""
@@ -78,6 +87,8 @@ class CoordinateRow:
     pdbx_pdb_ins_code: str | None
     auth_seq_id: str | None
     auth_asym_id: str | None
+    atom_site_id: str
+    model_num: str | None
 
     @property
     def instance_key(self) -> tuple[str | None, ...]:
@@ -90,6 +101,7 @@ class CoordinateRow:
             self.pdbx_pdb_ins_code,
             self.auth_seq_id,
             self.auth_asym_id,
+            self.model_num,
         )
 
 
@@ -168,9 +180,13 @@ class CcdDirectoryBuilder:
 
     def run(self) -> list[Path]:
         self._validate_directories()
+        # A failed rebuild must not leave earlier allocations available for renaming.
+        set_top_level_fields(self.input_dir, ccd_ligands=[])
         discovery = _discover_cif_files(self.input_dir)
         restraint_definitions = _load_restraint_definitions(discovery.restraint_paths)
-        coordinate_rows = _read_coordinate_rows(_load_coordinate_block(discovery.coordinate_path))
+        coordinate_block = _load_coordinate_block(discovery.coordinate_path)
+        coordinate_rows = _read_coordinate_rows(coordinate_block)
+        ligand_records = []
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -215,6 +231,15 @@ class CcdDirectoryBuilder:
                 )
                 output_path.write_text(output_document.as_string(), encoding="utf-8")
                 outputs.append(output_path)
+                ligand_records.append({
+                    "ligand_name": output_path.name,
+                    "source_coordinate": discovery.coordinate_path.name,
+                    "source_block": coordinate_block.name,
+                    "original_comp_id": instance.comp_id,
+                    "atom_site_ids": [row.atom_site_id for row in instance.rows],
+                    "instance": dict(zip(INSTANCE_FIELDS, instance.key)),
+                })
+        set_top_level_fields(self.input_dir, ccd_ligands=ligand_records)
         return outputs
 
     def _validate_directories(self) -> None:
@@ -404,6 +429,7 @@ def _determine_comp_id(restraint_atoms: list[AtomRow], restraint_bonds: list[Bon
 def _read_coordinate_rows(block: gemmi.cif.Block) -> list[CoordinateRow]:
     category = block.get_mmcif_category("_atom_site.")
     required_columns = [
+        "id",
         "label_comp_id",
         "label_atom_id",
         "type_symbol",
@@ -420,11 +446,16 @@ def _read_coordinate_rows(block: gemmi.cif.Block) -> list[CoordinateRow]:
         "auth_asym_id",
     ]
     _require_columns("_atom_site", category, required_columns)
-    rows = _category_rows(category, required_columns)
+    rows = _category_rows(category, required_columns + ["pdbx_PDB_model_num"])
+    ids = [row["id"] for row in rows]
+    if any(_normalize_optional_value(value) is None for value in ids) or len(ids) != len(set(ids)):
+        raise CifProcessingError("_atom_site.id values must be present and unique.")
     coordinate_rows: list[CoordinateRow] = []
     for index, row in enumerate(rows):
         coordinate_rows.append(
             CoordinateRow(
+                atom_site_id=row["id"],
+                model_num=_normalize_optional_value(row.get("pdbx_PDB_model_num")),
                 label_comp_id=row["label_comp_id"],
                 label_atom_id=row["label_atom_id"],
                 type_symbol=row["type_symbol"],
@@ -743,7 +774,7 @@ def _require_columns(category_name: str, category: dict[str, list[str]], columns
 
 
 def _normalize_optional_value(value: str | None) -> str | None:
-    if value is None or value in MISSING_VALUES:
+    if value is None or value is False or value in MISSING_VALUES:
         return None
     return value
 
@@ -771,17 +802,7 @@ def _log_non_zero_partial_charge(restraint_file_name: str, atom: AtomRow) -> Non
 
 
 def _format_instance_key(key: tuple[str | None, ...]) -> str:
-    labels = (
-        "label_alt_id",
-        "label_comp_id",
-        "label_asym_id",
-        "label_entity_id",
-        "label_seq_id",
-        "pdbx_PDB_ins_code",
-        "auth_seq_id",
-        "auth_asym_id",
-    )
-    return ", ".join(f"{label}={value or '.'}" for label, value in zip(labels, key))
+    return ", ".join(f"{label}={value or '.'}" for label, value in zip(INSTANCE_FIELDS, key))
 
 
 def _format_chiral_centers(chiral_centers: tuple[tuple[str, str], ...]) -> str:

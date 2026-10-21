@@ -222,3 +222,34 @@ Per-structure state is always recorded in:
 Keep CLI parsing in the command module and keep reusable processing logic in the
 stage module. This keeps the command surface easy to scan while making stages
 importable from tests or future orchestration code.
+
+### Ligand instance tracking and renaming
+
+`ccd-creation` records a top-level `ccd_ligands` list in each structure's
+`manifest.json`. Each entry links the generated filename (for example,
+`LIG__001.cif`) to its source coordinate filename and data block, the original
+component ID, the exact `_atom_site.id` values, and the residue identifiers
+(including alternate conformation and model number). Atom IDs are stored as
+strings, so they need not be consecutive integers.
+
+Annotation preserves those filenames. `ccd-finalise` matches its per-ligand
+results by filename and adds `CCD` plus finalisation metadata to each entry.
+Different instances can receive different codes; chemically identical instances
+can share a code. CSV reports remain available for review.
+
+`lig-rename <work-dir>` reads these manifest mappings directly. It parses the CIF
+and updates the recorded atoms' `label_comp_id` and `auth_comp_id`, component
+definitions, and matching nonpolymer scheme, entity, connection, and anisotropic
+atom references. Free text is preserved. Both original and enriched coordinate
+variants are checked before any files are written. Missing atom IDs, changed
+residue identifiers, overlapping mappings, unallocated codes, and ambiguous
+references cause a failure instead of a guessed replacement. Repeating a
+successful rename leaves the files unchanged.
+
+For existing datasets without instance provenance, rerun `ccd-creation`,
+`ccd-annotate`, and `ccd-finalise` before renaming. Existing code allocations can
+be reused with `ccd-finalise --code-map-file <previous-ccd_processing_details.csv>`.
+An explicit `lig-rename --summary-csv <report>` can override codes by
+`ligand_name`, but still requires the manifest's atom-site provenance. Recreating
+CCDs or starting finalisation clears earlier mappings so a failed run cannot
+silently reuse stale allocations.

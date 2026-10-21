@@ -1,10 +1,18 @@
-import csv
-import re
-import logging
 import argparse
+import csv
+import logging
+import os
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
+
+import gemmi
+
+from deposition_toolkit.stages.common.manifest import (
+    find_coordinate_files, load_manifest, set_top_level_fields,
+)
+from deposition_toolkit.stages.ccd_creation.ligand_renaming.instance_rename import rename_document
 
 
 @dataclass
@@ -20,6 +28,8 @@ def setup_logging(log_path: Path | None = None) -> logging.Logger:
     """Configure logging to output to both console and a log file."""
     logger = logging.getLogger("ligand_rename")
     logger.setLevel(logging.INFO)
+    for handler in logger.handlers:
+        handler.close()
     logger.handlers.clear()
 
     formatter = logging.Formatter("%(levelname)s: %(message)s")
@@ -45,78 +55,61 @@ def load_ligand_mapping(csv_path: Path) -> dict[str, list[dict[str, str]]]:
 
 
 def coordinate_cif_files(structure_dir: Path) -> list[Path]:
-    files: list[Path] = []
-    seen: set[Path] = set()
-    for pattern in ("*_enriched_struc.cif", "*_struc.cif"):
-        for path in sorted(structure_dir.glob(pattern), key=lambda item: item.name.lower()):
-            if path.is_file() and path not in seen:
-                files.append(path)
-                seen.add(path)
-    return files
+    return find_coordinate_files(structure_dir, prefer_enriched=False)
+
+
+def manifest_ligands(structure_dir: Path, summary_rows: list[dict] | None = None) -> list[dict]:
+    """An optional legacy report can supply codes, but never instance identity."""
+    records = load_manifest(structure_dir).get("ccd_ligands", [])
+    if summary_rows is None:
+        return records
+    by_name = {}
+    for row in summary_rows:
+        name = row.get("ligand_name", "")
+        if not name or name in by_name:
+            raise ValueError("CSV must contain one row per ligand_name.")
+        by_name[name] = row
+    if set(by_name) != {record["ligand_name"] for record in records}:
+        raise ValueError("CSV ligand names do not match manifest provenance; rerun CCD creation.")
+    return [dict(record, CCD=by_name[record["ligand_name"]].get("CCD", "")) for record in records]
 
 
 def rename_ligands_for_structure(
     structure: str,
     structure_dir: Path,
-    ligand_rows: list[dict[str, str]],
+    ligand_rows: list[dict],
     logger: logging.Logger,
 ) -> RenameResult:
-    lig_pattern = re.compile(r"\bLIG\b")
-
-    unique_ccds = {
-        row["CCD"].strip()
-        for row in ligand_rows
-        if row.get("CCD", "").strip()
-    }
-
-    if len(unique_ccds) > 1:
-        message = (
-            f"MANUAL REVIEW REQUIRED: '{structure}' maps to multiple different "
-            f"CCDs ({', '.join(sorted(unique_ccds))}). Skipping automatic replacement."
-        )
-        logger.warning(message)
-        return RenameResult(structure=structure, status="failed", messages=[message])
-    if len(unique_ccds) == 0:
-        message = f"SKIPPED: '{structure}' has no valid CCD values in the CSV."
-        logger.warning(message)
-        return RenameResult(structure=structure, status="not applicable", messages=[message])
-
-    ccd_to_use = unique_ccds.pop()
-    matched_files = coordinate_cif_files(structure_dir)
-    if not matched_files:
-        message = f"FILE NOT FOUND: No coordinate *_struc.cif found in directory '{structure_dir}'"
-        logger.warning(message)
-        return RenameResult(structure=structure, status="failed", messages=[message])
-
     result = RenameResult(structure=structure, status="done")
-    for cif_path in matched_files:
-        try:
-            content = cif_path.read_text(encoding="utf-8")
-            new_content, num_replacements = lig_pattern.subn(ccd_to_use, content)
-            if num_replacements > 0:
-                cif_path.write_text(new_content, encoding="utf-8")
-                result.replacements += num_replacements
-                result.files.append(str(cif_path))
-                logger.info(
-                    "SUCCESS: '%s' -> Replaced %d instance(s) of 'LIG' with '%s' in %s",
-                    structure,
-                    num_replacements,
-                    ccd_to_use,
-                    cif_path.name,
-                )
-            else:
-                result.files.append(str(cif_path))
-                logger.info(
-                    "UNCHANGED: '%s' -> No standalone instances of 'LIG' found in %s",
-                    structure,
-                    cif_path.name,
-                )
-        except Exception as exc:
-            message = f"ERROR: Failed to process file {cif_path}. Reason: {exc}"
-            logger.error(message)
-            result.status = "failed"
-            result.messages.append(message)
-
+    staged = []
+    try:
+        matched_files = coordinate_cif_files(structure_dir)
+        if not matched_files:
+            raise ValueError(f"No coordinate CIF files found in {structure_dir}.")
+        # Validate all coordinate variants before replacing any files.
+        for cif_path in matched_files:
+            document = gemmi.cif.read_file(str(cif_path))
+            replacements = rename_document(document, ligand_rows)
+            staged.append((cif_path, document.as_string(), replacements))
+        for cif_path, content, replacements in staged:
+            if replacements:
+                fd, name = tempfile.mkstemp(dir=cif_path.parent, prefix=f".{cif_path.name}.")
+                try:
+                    with os.fdopen(fd, "w", encoding="utf-8") as output:
+                        output.write(content)
+                    os.chmod(name, cif_path.stat().st_mode)
+                    os.replace(name, cif_path)
+                finally:
+                    if os.path.exists(name):
+                        os.unlink(name)
+            result.files.append(str(cif_path))
+            result.replacements += replacements
+            logger.info("%s: updated %d component fields in %s", structure, replacements, cif_path.name)
+    except Exception as exc:
+        message = f"Failed to rename ligands for {structure}: {exc}"
+        logger.error(message)
+        result.status = "failed"
+        result.messages.append(message)
     return result
 
 
@@ -158,16 +151,18 @@ def process_cif_files(
                 messages=[message],
             )
             continue
-        results[structure] = rename_ligands_for_structure(
-            structure,
-            struct_dir_path,
-            structures_map[structure],
-            logger,
-        )
+        try:
+            ligands = manifest_ligands(struct_dir_path, structures_map[structure])
+        except ValueError as exc:
+            results[structure] = RenameResult(structure, "failed", messages=[str(exc)])
+            continue
+        results[structure] = rename_ligands_for_structure(structure, struct_dir_path, ligands, logger)
+        if results[structure].status == "done":
+            set_top_level_fields(struct_dir_path, ccd_ligands=ligands)
     return results
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Rename 'LIG' to CCD codes in CIF files based on a CSV mapping.")
+    parser = argparse.ArgumentParser(description="Rename manifest ligand instances with codes from a CSV report.")
     parser.add_argument("csv_file", help="Path to the input CSV file")
     parser.add_argument("root_dir", help="Root directory containing the structure subfolders")
     parser.add_argument("--log-path", help="Optional path for a durable log file.")
