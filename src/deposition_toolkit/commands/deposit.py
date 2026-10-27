@@ -2,10 +2,20 @@ from __future__ import annotations
 
 import argparse
 import os
+from collections.abc import Callable
 from pathlib import Path
 
-from deposition_toolkit.stages.common.manifest import relative_to_work_dir, set_top_level_fields, update_step
-from deposition_toolkit.stages.deposit.deposition import LOGGER as DEPOSITION_LOGGER, deposit_structure
+from deposition_toolkit.stages.common.manifest import (
+    load_manifest,
+    relative_to_work_dir,
+    set_top_level_fields,
+    update_step,
+)
+from deposition_toolkit.stages.deposit.deposition import (
+    LOGGER as DEPOSITION_LOGGER,
+    dataset_from_manifest,
+    deposit_structure,
+)
 
 from .shared import (
     STEP_DEPOSITION,
@@ -30,7 +40,16 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     parser.set_defaults(func=run)
 
 
-def run(args: argparse.Namespace) -> int:
+def run(
+    args: argparse.Namespace,
+    *,
+    session_lookup: Callable[[str, str], str | None] | None = None,
+) -> int:
+    """Deposit each structure; optionally look up its saved session before upload.
+
+    session_lookup(dataset, structure_id) returns a OneDep session UUID or None.
+    A future database adapter can supply this lookup and store result.to_record().
+    """
     work_dir = Path(args.work_dir).resolve()
     structure_dirs = require_structures(work_dir, STEP_DEPOSITION)
     if not structure_dirs:
@@ -39,10 +58,16 @@ def run(args: argparse.Namespace) -> int:
     log_root = results_path(work_dir, "logs", "deposition")
     any_failed = False
     for structure_dir in structure_dirs:
+        manifest = load_manifest(structure_dir)
+        session_id = (
+            session_lookup(dataset_from_manifest(manifest), manifest["structure_id"])
+            if session_lookup is not None else None
+        )
         log_path = log_root / f"{structure_dir.name}.log"
         with stage_log_handler(DEPOSITION_LOGGER, log_path):
             result = deposit_structure(
                 structure_dir,
+                session_id=session_id,
                 email=args.email,
                 users=args.users,
                 country=args.country,
@@ -55,7 +80,12 @@ def run(args: argparse.Namespace) -> int:
         result_dict = dataclass_to_dict(result)
         any_failed = any_failed or result.status == "failed"
         if result.deposition_id:
-            set_top_level_fields(structure_dir, deposition_id=result.deposition_id)
+            set_top_level_fields(
+                structure_dir,
+                deposition_id=result.deposition_id,
+                session_id=result.session_id,
+            )
+            result_dict["deposition_record"] = result.to_record()
         update_step(
             structure_dir,
             STEP_DEPOSITION,

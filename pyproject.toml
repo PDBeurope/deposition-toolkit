@@ -16,6 +16,10 @@ dependencies = [
     "rdkit>=2026.9.1",
     "mysql-connector-python>=26.7.0",
     "pydantic-settings>=2.0,<3",
+    "sqlalchemy>=2.0,<3",
+    "alembic>=1.18,<2",
+    "psycopg[binary]>=3.2,<4",
+    "pydantic>=2,<3",
 ]
 
 [project.scripts]
@@ -27,3 +31,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"deposition_toolkit.ledger" = ["alembic.ini", "migrations/script.py.mako"]

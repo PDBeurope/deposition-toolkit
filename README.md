@@ -45,15 +45,67 @@ validated and cached on first use; restart the command after editing `.env`.
 | `DEPOSITION_ROOT` | OneDep deposition root used by the validation report |
 | `MMCIF_DICTIONARY_PATH` | Default mmCIF dictionary for validation and metadata enrichment; defaults to `/nfs/public/services/onedep_gpfs/deposition-toolkit-processing/mmcif_pdbx_v50.dic` |
 | `CCD_DB_HOST`, `CCD_DB_PORT`, `CCD_DB_USER`, `CCD_DB_PASSWORD`, `CCD_DB_TIMEOUT` | Existing OneDep MySQL connection for CCD finalisation |
-| `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE` | Future toolkit PostgreSQL connection settings |
+| `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE` | Toolkit ledger PostgreSQL connection settings |
 
 The PostgreSQL defaults are host `pgsql-hlvm-172`, port `5432`, user `pdb_dep`,
-and password `place-holder`. Leave the database name unset until provisioned.
-These settings are reserved for later use; no PostgreSQL connection is opened.
+and password `place-holder`. Set the actual connection credentials to use the
+ledger. The database name defaults to `POSTGRES_USER`; optionally set
+`POSTGRES_DATABASE` if the database name differs. Other commands do not require
+a PostgreSQL database.
 
 Python callers can use `from deposition_toolkit.config import get_settings`.
 Passwords use `SecretStr`; call `.get_secret_value()` only when passing a password
 to a database client.
+
+## Ledger
+
+The persistence layer lives in `src/deposition_toolkit/ledger`: SQLAlchemy ORM
+models in `models/`, Pydantic input/output schemas in `schemas.py`, connection and
+transaction management in `database.py`, and Alembic migrations in `migrations/`.
+The foundation includes an empty baseline migration and no feature tables.
+PostgreSQL must already be provisioned; migrations manage its schema, not the
+database or database users.
+
+After setting `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, and
+`POSTGRES_PASSWORD` in `.env`:
+
+```bash
+uv run deposition-toolkit ledger check
+uv run deposition-toolkit ledger upgrade
+uv run deposition-toolkit ledger current
+```
+
+`check` executes `SELECT 1`; `upgrade` applies migrations up to the latest revision
+and creates Alembic's version table. Connections are lazy and use a ten-second
+connection timeout. Importing the ledger or displaying command help does not
+connect to PostgreSQL. Schema changes are applied explicitly through Alembic,
+never automatically during normal command execution.
+
+Only command modules call ledger operations. Keep queries and transactions
+inside the ledger, validate their inputs and outputs with Pydantic, and return
+plain values or validated schemas to commands. Commands pass those values as
+stage parameters and may persist stage results afterward. Stages must never
+import the ledger, hold database sessions, or receive ORM objects. Keep database
+transactions short and finish them before invoking a stage.
+
+For future features, derive ORM models from `ledger.models.Base` and import them
+in `ledger/models/__init__.py` for Alembic discovery. Derive validation models
+from `ledger.schemas.LedgerSchema`. Inside ledger operations,
+`with session_scope() as session:` commits on success and rolls back on failure,
+always closing the session. Do not use `Base.metadata.create_all()` at runtime.
+
+Generate a migration from the repository root after adding models:
+
+```bash
+uv run alembic -c src/deposition_toolkit/ledger/alembic.ini revision --autogenerate -m "Describe the schema change"
+# Review the generated migration before applying it.
+uv run deposition-toolkit ledger upgrade
+```
+
+Use the same Alembic configuration for `history`, offline SQL generation
+(`upgrade head --sql`), or an explicit `downgrade`. Migration files and templates
+are included in the installed package. Generate new revisions in the source
+checkout and ship them with the application.
 
 ## Workflow
 
@@ -183,6 +235,35 @@ uv run deposition-toolkit deposit \
   --email depositor@example.org \
   --users 0000-0002-8612-9539
 ```
+
+To replace files in an existing deposition, pass `session_id` to
+`deposit_structure(...)`. Without it, a new deposition is created. For one
+structure, the stage CLI also accepts the saved session UUID:
+
+```bash
+uv run python -m deposition_toolkit.stages.deposit.deposition \
+  /path/to/structure --session-id SAVED_SESSION_UUID
+```
+
+Re-upload resumes the saved depositor and experiment settings, checks replacement
+files, replaces local registrations of the same file types, and uploads to the
+existing remote deposition. The original OneDep session files must remain in
+the configured `session_dir`; the remote deposition ID alone is insufficient.
+
+`commands.deposit.run(args, session_lookup=lookup)` accepts a per-structure
+lookup function `lookup(dataset, structure_id) -> session_id | None` for future
+database integration. No database lookup is performed by default. The dataset
+comes from the manifest's `source_tarball` (normally under
+`steps.prepare_dataset`), with the archive extension removed; `structure_id`
+comes from the manifest. Missing source tarballs produce an empty dataset.
+
+`DepositionResult.to_record()` returns `dep_id`, `dataset`, `structure_id`, and
+`session_id` for database storage. The command saves this record under
+`steps.deposition.deposition_record` whenever a remote deposition ID is known,
+and saves `deposition_id` and `session_id` at the top level of the manifest.
+Check the result status before marking a database record as successfully uploaded:
+IDs are retained after failures so the existing deposition can be recovered.
+Dry runs discover files without creating or resuming a session.
 
 ## CCD finalisation safety
 

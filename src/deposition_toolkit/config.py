@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     ccd_db_password: SecretStr = SecretStr("")
     ccd_db_timeout: int = Field(default=30, gt=0)
 
-    # Reserved for the toolkit database; no connection is opened by settings.
+    # The ledger validates required connection values only when explicitly used.
     postgres_host: str = "pgsql-hlvm-172"
     postgres_port: int = Field(default=5432, ge=1, le=65535)
     postgres_user: str = "pdb_dep"

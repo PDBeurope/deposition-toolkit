@@ -8,6 +8,7 @@ from . import (
     deposit,
     enrich_metadata,
     lig_rename,
+    ledger,
     mmcif_validation,
     prepare_dataset,
     resolution_cleanup,
@@ -16,6 +17,7 @@ from . import (
 
 
 COMMAND_MODULES = (
+    ledger,
     prepare_dataset,
     submission_report,
     mmcif_validation,
