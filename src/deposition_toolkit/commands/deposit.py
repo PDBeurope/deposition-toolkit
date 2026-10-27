@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -26,6 +27,9 @@ from .shared import (
 )
 
 
+LOGGER = logging.getLogger("deposition_toolkit")
+
+
 def register(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("deposit", help="Upload each active structure through OneDep.")
     parser.add_argument("work_dir")
@@ -45,24 +49,34 @@ def run(
     *,
     session_lookup: Callable[[str, str], str | None] | None = None,
 ) -> int:
-    """Deposit each structure; optionally look up its saved session before upload.
-
-    session_lookup(dataset, structure_id) returns a OneDep session UUID or None.
-    A future database adapter can supply this lookup and store result.to_record().
-    """
+    """Look up sessions and persist results at the command boundary only."""
     work_dir = Path(args.work_dir).resolve()
     structure_dirs = require_structures(work_dir, STEP_DEPOSITION)
     if not structure_dirs:
         return 1
 
+    if not args.dry_run:
+        from sqlalchemy.exc import SQLAlchemyError
+
+        from deposition_toolkit.ledger.depositions import find_session_id, save_deposition
+
+        lookup = session_lookup if session_lookup is not None else find_session_id
+
     log_root = results_path(work_dir, "logs", "deposition")
     any_failed = False
     for structure_dir in structure_dirs:
         manifest = load_manifest(structure_dir)
-        session_id = (
-            session_lookup(dataset_from_manifest(manifest), manifest["structure_id"])
-            if session_lookup is not None else None
-        )
+        session_id = None
+        if not args.dry_run:
+            try:
+                session_id = lookup(dataset_from_manifest(manifest), manifest["structure_id"])
+            except (ValueError, SQLAlchemyError):
+                LOGGER.error(
+                    "Deposition registry lookup failed for %s. Check database settings, "
+                    "migrations, manifest identity and saved session availability; no upload was started.",
+                    manifest["structure_id"],
+                )
+                return 1
         log_path = log_root / f"{structure_dir.name}.log"
         with stage_log_handler(DEPOSITION_LOGGER, log_path):
             result = deposit_structure(
@@ -94,4 +108,14 @@ def run(
             error=result.error or None,
             extra=result_dict,
         )
+        if not args.dry_run and result.deposition_id and result.session_id:
+            try:
+                save_deposition(result.to_record())
+            except (ValueError, SQLAlchemyError):
+                LOGGER.error(
+                    "Could not save deposition registry entry for %s. Deposition %s and session %s "
+                    "are saved in its manifest; reconcile the registry before retrying.",
+                    result.structure_id, result.deposition_id, result.session_id,
+                )
+                return 1
     return 1 if any_failed else 0

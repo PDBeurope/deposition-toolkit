@@ -50,8 +50,8 @@ validated and cached on first use; restart the command after editing `.env`.
 The PostgreSQL defaults are host `pgsql-hlvm-172`, port `5432`, user `pdb_dep`,
 and password `place-holder`. Set the actual connection credentials to use the
 ledger. The database name defaults to `POSTGRES_USER`; optionally set
-`POSTGRES_DATABASE` if the database name differs. Other commands do not require
-a PostgreSQL database.
+`POSTGRES_DATABASE` if the database name differs. The `deposit` command uses this
+database, except for dry runs. Other processing commands do not require PostgreSQL.
 
 Python callers can use `from deposition_toolkit.config import get_settings`.
 Passwords use `SecretStr`; call `.get_secret_value()` only when passing a password
@@ -62,7 +62,7 @@ to a database client.
 The persistence layer lives in `src/deposition_toolkit/ledger`: SQLAlchemy ORM
 models in `models/`, Pydantic input/output schemas in `schemas.py`, connection and
 transaction management in `database.py`, and Alembic migrations in `migrations/`.
-The foundation includes an empty baseline migration and no feature tables.
+Migration `0002` adds the `deposition_registry` table after the empty baseline.
 PostgreSQL must already be provisioned; migrations manage its schema, not the
 database or database users.
 
@@ -250,20 +250,40 @@ files, replaces local registrations of the same file types, and uploads to the
 existing remote deposition. The original OneDep session files must remain in
 the configured `session_dir`; the remote deposition ID alone is insufficient.
 
-`commands.deposit.run(args, session_lookup=lookup)` accepts a per-structure
-lookup function `lookup(dataset, structure_id) -> session_id | None` for future
-database integration. No database lookup is performed by default. The dataset
-comes from the manifest's `source_tarball` (normally under
+Before a real upload, `deposit` queries `deposition_registry` for the manifest's
+`(dataset, structure_id)`. An existing session is passed to the stage for re-upload;
+an absent entry creates a new deposition. The dataset comes from the manifest's
+`source_tarball` (normally under
 `steps.prepare_dataset`), with the archive extension removed; `structure_id`
-comes from the manifest. Missing source tarballs produce an empty dataset.
+comes from the manifest. Both identity fields must be nonempty for database use.
+`commands.deposit.run(args, session_lookup=lookup)` can override session lookup
+with `lookup(dataset, structure_id) -> session_id | None`; results are still stored
+in the registry.
 
 `DepositionResult.to_record()` returns `dep_id`, `dataset`, `structure_id`, and
 `session_id` for database storage. The command saves this record under
 `steps.deposition.deposition_record` whenever a remote deposition ID is known,
 and saves `deposition_id` and `session_id` at the top level of the manifest.
-Check the result status before marking a database record as successfully uploaded:
-IDs are retained after failures so the existing deposition can be recovered.
-Dry runs discover files without creating or resuming a session.
+After an upload, the command inserts or updates the registry row with these four
+fields, `automated_depostion=true`, and a database-generated `deposited_on` timestamp.
+The table also has an integer primary key `id` and a unique constraint on
+`(dataset, structure_id)`, so re-uploads update the existing entry and timestamp.
+The column name `automated_depostion` follows the registry schema. Manual entries
+can set it to false and leave `session_id` null; those entries block automatic
+upload until a resumable session is supplied.
+
+Known remote and session IDs are stored even when uploading or processing fails,
+so retries reuse the remote deposition. A registry row identifies a deposition;
+the manifest's step status records whether the upload finished successfully.
+Lookup failures stop execution before upload. Save failures stop the batch with
+a nonzero exit status after saving the recovery details in the manifest; reconcile
+the registry using those details before retrying. Dry runs skip registry access
+and discover files without creating or resuming a session. Apply the schema before
+using the deposit command:
+
+```bash
+uv run deposition-toolkit ledger upgrade
+```
 
 ## CCD finalisation safety
 

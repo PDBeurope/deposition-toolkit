@@ -172,8 +172,10 @@ class DepositionTests(unittest.TestCase):
         args = argparse.Namespace(work_dir=str(self.work_dir), email='', users='', country='UK',
                                   experiment_type='XRAY', no_poll=True, poll_interval=5,
                                   max_polls=64, dry_run=False)
-        with patch.object(deposit, 'deposit_structure', side_effect=upload) as stage:
+        with patch.object(deposit, 'deposit_structure', side_effect=upload) as stage, \
+             patch('deposition_toolkit.ledger.depositions.save_deposition') as save:
             self.assertEqual(deposit.run(args, session_lookup=lookup), 0)
+        self.assertEqual(save.call_count, 2)
         self.assertEqual(lookup.call_args_list, [
             unittest.mock.call('RFKAT2B_Cryo_20261014', 'manifest-id'),
             unittest.mock.call('other', 'second-id'),

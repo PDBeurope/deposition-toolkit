@@ -1,4 +1,4 @@
-"""Register future ORM models here so Alembic discovers their metadata."""
+"""Register ORM models here so Alembic discovers their metadata."""
 
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
@@ -12,3 +12,6 @@ class Base(DeclarativeBase):
         "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
         "pk": "pk_%(table_name)s",
     })
+
+
+from .deposition import DepositionRegistry  # noqa: E402,F401

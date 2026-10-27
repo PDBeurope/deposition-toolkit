@@ -100,7 +100,7 @@ class LedgerTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             Example(value=3, unexpected=True)
 
-    def test_postgres_offline_migration_has_only_version_table(self):
+    def test_postgres_offline_migration_creates_registry(self):
         settings = LedgerSettings(host="localhost", port=5432, user="user",
                                   password="test", database="ledger")
         output = StringIO()
@@ -110,8 +110,11 @@ class LedgerTests(unittest.TestCase):
         sql = output.getvalue()
         self.assertIn("CREATE TABLE alembic_version", sql)
         self.assertIn("0001", sql)
-        self.assertEqual(sql.count("CREATE TABLE"), 1)
-        self.assertEqual(len(Base.metadata.tables), 0)
+        self.assertIn("CREATE TABLE deposition_registry", sql)
+        self.assertIn("UNIQUE (dataset, structure_id)", sql)
+        self.assertIn("TIMESTAMP WITH TIME ZONE", sql)
+        self.assertEqual(sql.count("CREATE TABLE"), 2)
+        self.assertEqual(set(Base.metadata.tables), {"deposition_registry"})
 
     def test_cli_help_does_not_import_database_dependencies(self):
         # A fresh interpreter catches eager imports, even when tests imported ledger.
