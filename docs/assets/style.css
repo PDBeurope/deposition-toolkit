@@ -1,0 +1,25 @@
+:root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #203044; background: #fff; line-height: 1.65; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+header, main, footer { max-width: 1120px; margin: auto; padding: 1.5rem 2rem; }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid #dce4ec; }
+.brand { font-size: 1.2rem; font-weight: 750; text-decoration: none; }
+nav { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+a { color: #145f9d; text-underline-offset: .18em; }
+a:hover { color: #073863; }
+h1, h2, h3 { color: #14273b; line-height: 1.25; margin-top: 2rem; }
+h1 { font-size: 2.2rem; }
+h2 { border-bottom: 1px solid #e5eaf0; padding-bottom: .4rem; }
+table { display: block; overflow-x: auto; border-collapse: collapse; width: 100%; margin: 1.5rem 0; font-size: .94rem; }
+th, td { text-align: left; vertical-align: top; border: 1px solid #dce4ec; padding: .65rem .85rem; }
+th { background: #edf3f8; }
+tr:nth-child(even) { background: #f8fafc; }
+pre { overflow-x: auto; background: #f3f6fa; border: 1px solid #e0e7ee; border-radius: 6px; padding: 1rem; line-height: 1.5; }
+code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; overflow-wrap: anywhere; }
+.diagram { overflow-x: auto; margin: 1.5rem 0; padding: 1rem; border: 1px solid #e0e7ee; border-radius: 6px; }
+.diagram svg { display: block; margin: auto; height: auto; }
+footer { border-top: 1px solid #dce4ec; font-size: .85rem; color: #536477; }
+.skip-link { position: absolute; left: -9999px; }
+.skip-link:focus { left: 1rem; top: 1rem; background: white; padding: 1rem; }
+@media (max-width: 640px) { header, main, footer { padding: 1rem; } h1 { font-size: 1.8rem; } }
+@media print { header, footer { display: none; } main { max-width: none; padding: 0; } pre, table, .diagram { overflow: visible; } }

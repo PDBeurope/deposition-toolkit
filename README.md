@@ -3,6 +3,17 @@
 Tools for preparing crystallographic deposition datasets, creating CCDs, updating
 mmCIF metadata, and depositing structures through OneDep.
 
+## Documentation
+
+Start at the [documentation home](docs/index.md) for linked guides covering:
+
+- [Architecture and dataflow](docs/architecture.md): module responsibilities, standalone stages, command wrappers and database boundaries.
+- [Getting started](docs/getting-started.md), [configuration](docs/configuration.md) and the [CLI reference](docs/cli.md).
+- [Command internals](docs/commands/index.md): algorithms, decision diagrams, outputs and edge cases for every command.
+- [Files and manifests](docs/data-and-state.md), [recovery](docs/recovery.md) and [extending the toolkit](docs/development.md).
+
+The same Markdown supports GitHub and [GitHub Pages publication](docs/publishing.md), including Mermaid rendering.
+
 The command-line entry point is:
 
 ```bash
@@ -318,7 +329,7 @@ Per-structure state is always recorded in:
 2. Implement `register(subparsers)` and `run(args)`.
 3. Import the command module in `src/deposition_toolkit/commands/__init__.py`.
 4. Add the module to `COMMAND_MODULES`.
-5. Put reusable stage logic under `src/stages/<stage_name>/`.
+5. Put reusable stage logic under `src/deposition_toolkit/stages/<stage_name>/`.
 
 Keep CLI parsing in the command module and keep reusable processing logic in the
 stage module. This keeps the command surface easy to scan while making stages

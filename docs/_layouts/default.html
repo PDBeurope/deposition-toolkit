@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page.title | escape }} · {{ site.title | escape }}</title>
+    <meta name="description" content="{{ site.description | escape }}">
+    <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header>
+      <a class="brand" href="{{ '/' | relative_url }}">Deposition toolkit</a>
+      <nav aria-label="Main navigation">
+        <a href="{{ '/getting-started.html' | relative_url }}">Usage</a>
+        <a href="{{ '/architecture.html' | relative_url }}">Architecture</a>
+        <a href="{{ '/commands/' | relative_url }}">Command internals</a>
+        <a href="https://github.com/PDBeurope/deposition-toolkit">GitHub</a>
+      </nav>
+    </header>
+    <main id="content">{{ content }}</main>
+    <footer>Documentation follows the repository implementation. Review command logs and manifests when operating a dataset.</footer>
+    <script type="module" src="{{ '/assets/diagrams.js' | relative_url }}"></script>
+  </body>
+</html>

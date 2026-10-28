@@ -1,0 +1,22 @@
+title: Deposition toolkit
+description: Architecture, operation and command internals
+url: https://pdbeurope.github.io
+baseurl: /deposition-toolkit
+markdown: kramdown
+kramdown:
+  input: GFM
+plugins:
+  - jekyll-relative-links
+relative_links:
+  enabled: true
+  collections: false
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - check_docs.py
