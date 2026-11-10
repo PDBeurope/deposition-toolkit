@@ -57,4 +57,16 @@ The wrapper stores the result under `steps.deposition`. If a remote ID is known,
 
 **Dry-run:** bypasses PostgreSQL and OneDep imports/config/authentication/session creation; it requires matching coordinate/SF files and writes a result/log/manifest. It does not validate file content.
 
-**Edges:** missing local session files cannot be repaired from a remote ID alone. The wrapper uses the registry rather than top-level manifest IDs for session lookup. A created session with no remote ID is not persisted to the registry by this wrapper; inspect local session storage on such failures. Remote upload and registry upsert are not one atomic operation. Repeated commands intentionally replace remote files, not simply skip `done` structures. An injectable Python `session_lookup` can replace lookup in `commands.deposit.run()`, but normal result persistence still runs.
+**Edges:** missing local session files cannot be repaired from a remote ID alone. The wrapper uses the registry rather than top-level manifest IDs for session lookup. A created session with no remote ID is not persisted to the registry by this wrapper; inspect local session storage on such failures. Remote upload and registry upsert are not one atomic operation. Repeated commands intentionally replace remote files, not simply skip `done` structures.
+
+## Python and standalone entry points
+
+For integrations, `commands.deposit.run(args, session_lookup=lookup)` accepts a callable with the contract `lookup(dataset, structure_id) -> session_id | None`. This overrides registry lookup; normal result persistence still runs.
+
+The stage API `deposit_structure(structure_dir, session_id=...)` resumes the supplied local OneDep session. Omitting `session_id` creates a new deposition. The equivalent standalone invocation for a replacement upload is:
+
+```bash
+uv run python -m deposition_toolkit.stages.deposit.deposition /path/to/structure --session-id SAVED_SESSION_UUID
+```
+
+Standalone execution leaves toolkit ledger lookup/upsert and wrapper manifest updates to the caller; see [running stages independently](../development.md#running-stages-independently).

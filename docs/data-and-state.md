@@ -139,7 +139,7 @@ Registry identity is `(dataset, structure_id)`. `dataset_from_manifest()` uses t
 | `dataset`, `structure_id` | Text, unique as a pair |
 | `dep_id` | Remote deposition identifier |
 | `session_id` | Local OneDep session UUID; nullable for manual entries |
-| `automated_depostion` | Boolean, default true; spelling matches current schema |
+| `automated_depostion` | Boolean, default true; automated upserts set true, manual entries can set false; spelling matches current schema |
 | `deposited_on` | Database timestamp with timezone; refreshed on automated upsert |
 
 Pydantic validates nonempty automated identity/registration inputs. A registry entry without a resumable session blocks automatic upload. Upsert updates an existing identity atomically, but lookup plus remote upload is not one database transaction: simultaneous deposit commands can still create competing remote sessions. A registry row records identity, not proof of successful upload; inspect manifest status too.

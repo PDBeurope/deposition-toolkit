@@ -54,4 +54,4 @@ From the repository root:
 uv run python docs/check_docs.py
 ```
 
-The checker validates local Markdown file/fragment links, balanced fences, required page front matter, command-page coverage, and example JSON/YAML syntax. It does not build Jekyll, validate Mermaid grammar, or contact external links. Also run a Jekyll build and visually review Mermaid rendering when changing site templates or diagrams.
+The checker validates local Markdown file/fragment links and balanced fences in the README and documentation, required documentation page front matter, command-page coverage, and example JSON/YAML syntax. It does not build Jekyll, validate Mermaid grammar, or contact external links. Also run a Jekyll build and visually review Mermaid rendering when changing site templates or diagrams.

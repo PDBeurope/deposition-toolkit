@@ -66,6 +66,16 @@ Defaults come from `src/deposition_toolkit/config.py`; `.env.example` is the edi
 
 Passwords are `SecretStr` inside toolkit settings. Database adapters unwrap them only when creating client connections. `.env` is ignored by Git; do not include real credentials in documentation or command examples.
 
+Python callers access the same cached settings through:
+
+```python
+from deposition_toolkit.config import get_settings
+
+settings = get_settings()
+```
+
+Use `.get_secret_value()` on password fields only when passing them to a database client.
+
 ## Annotation tools
 
 `default_environment()` builds an environment for the subprocess with `CC_TOOLS`, `OE_DIR`, `OE_LICENSE`, `CACTVS_DIR`, `CORINA_DIR`, `BABEL_DIR`, `BABEL_DATADIR`, `INCHI_DIR`, `BABEL_LIB`, and `LOCAL_APPS_LIB` beneath `TOOLS_ROOT`. It prepends OpenBabel and local library directories to `LD_LIBRARY_PATH`.

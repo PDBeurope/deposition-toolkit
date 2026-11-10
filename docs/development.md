@@ -52,7 +52,7 @@ uv run alembic -c src/deposition_toolkit/ledger/alembic.ini revision --autogener
 uv run deposition-toolkit ledger upgrade
 ```
 
-The Alembic configuration also supports explicit `history`, offline SQL generation (`upgrade head --sql`), and intentional downgrades. Generate revisions in a checkout and ship them in the package. Do not auto-call `Base.metadata.create_all()` during normal runtime.
+The Alembic configuration also supports explicit `history`, offline SQL generation (`upgrade head --sql`), and intentional downgrades. Migration files, the Alembic configuration and its revision template are included in the installed package. Generate revisions in a checkout and ship them in the package. Do not auto-call `Base.metadata.create_all()` during normal runtime.
 
 ## Verification and test map
 

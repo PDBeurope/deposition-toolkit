@@ -19,7 +19,7 @@ flowchart LR
     E --> F
 ```
 
-`check` verifies connectivity without creating tables. `current` displays the applied migration revision. `upgrade` applies revisions through head; `0001` is an empty baseline and `0002` creates `deposition_registry`. PostgreSQL and its login role must already exist.
+`check` verifies connectivity without creating tables. `current` displays the applied migration revision. `upgrade` applies revisions through head and creates Alembic's version table to track the applied revision; `0001` is an empty baseline and `0002` creates `deposition_registry`. PostgreSQL and its login role must already exist.
 
 The SQLAlchemy engine is cached and created lazily, uses `pool_pre_ping`, hides query parameters, and sets a ten-second connect timeout. Importing ledger modules or displaying help does not connect. Normal stage execution does not auto-create tables.
 

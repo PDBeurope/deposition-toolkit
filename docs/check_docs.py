@@ -30,13 +30,13 @@ def headings(markdown: str) -> set[str]:
 
 def check() -> list[str]:
     errors: list[str] = []
-    pages = sorted(DOCS.rglob("*.md"))
+    pages = [ROOT / "README.md", *sorted(DOCS.rglob("*.md"))]
     diagram_count = 0
     for page in pages:
         text = page.read_text()
         label = str(page.relative_to(ROOT))
         front = re.match(r"\A---\n(.*?)\n---\n", text, flags=re.S)
-        if not front or not yaml.safe_load(front.group(1)).get("title"):
+        if page != ROOT / "README.md" and (not front or not yaml.safe_load(front.group(1)).get("title")):
             errors.append(f"{label}: missing title front matter")
         opened: str | None = None
         body: list[str] = []
