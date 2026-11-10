@@ -242,9 +242,7 @@ Deposit active structures:
 
 ```bash
 uv run deposition-toolkit deposit \
-  /path/to/work-dir \
-  --email depositor@example.org \
-  --users 0000-0002-8612-9539
+  /path/to/work-dir 
 ```
 
 To replace files in an existing deposition, pass `session_id` to

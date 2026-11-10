@@ -12,7 +12,7 @@ import requests
 import time
 from datetime import datetime, timedelta
 from deposition_toolkit.config import get_settings
-# from pdbe_sifts.mmcif.curator.cif_sequence_update import CifSequenceUpdater
+from pdbe_sifts.mmcif.curator.cif_sequence_update import CifSequenceUpdater
 
 
 
@@ -679,8 +679,8 @@ def enrich_cif_file(
     enrich_chem_comp(storage)
     storage.write_to_cif(str(output_cif), block_name=entry_id)
 
-    # updater = CifSequenceUpdater(output_cif, output_cif)
-    # updater.process()
+    updater = CifSequenceUpdater(output_cif, output_cif)
+    updater.process()
 
     result: dict[str, Any] = {
         "input_cif": str(input_cif),

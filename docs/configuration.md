@@ -23,6 +23,7 @@ This hierarchy describes toolkit settings. `WWPDB_*` and the OneDep library use 
 ## Settings by stage
 
 All paths below are deployment inputs; they are not downloaded or provisioned by the configuration loader.
+Here is a summary of which settings are used by which parameter.
 
 | Command | Settings it needs | Why / alternative |
 | --- | --- | --- |
@@ -52,7 +53,7 @@ Defaults come from `src/deposition_toolkit/config.py`; `.env.example` is the edi
 | `CCD_CVS_PATH` | `/nfs/public/services/onedep_gpfs/data/production/reference/components/ligand-dict-v3` |
 | `TOOLS_ROOT` | `/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9` |
 | `ANNOTATE_BIN` | Unset; derives `<TOOLS_ROOT>/packages/cc-tools-v2/bin/annotateComp` |
-| `CCD_DB_HOST` | `mysql-pdbe-onedep-prod.ebi.ac.uk` |
+| `CCD_DB_HOST` | `mysql-pdbe-onedep-prod` |
 | `CCD_DB_PORT` | `4437` |
 | `CCD_DB_USER` | `pdberead` |
 | `CCD_DB_PASSWORD` | Empty in code; example file has `place-holder`; supply the real credential for MySQL |
@@ -80,7 +81,9 @@ export WWPDB_EMAIL=depositor@example.org
 export WWPDB_USERS=0000-0002-8612-9539
 ```
 
-`deposit_structure()` delegates authentication and session configuration to `onedep_lib.config.DepositConfig.load()`. The installed library inspected for these docs uses `~/.config/onedep/config.toml`, a `[default]` section for ordinary settings, and host-specific `[auths.…]` token entries. It also reads process variables `ONEDEP_ACCESS_TOKEN`, `ONEDEP_REFRESH_TOKEN`, `ONEDEP_HOSTNAME`, `ONEDEP_SSL_VERIFY`, `ONEDEP_REDIRECT`, and `ONEDEP_SCHEMA_URL`. Obtain credentials through the OneDep setup used by your installation.
+`deposit_structure()` delegates authentication and session configuration to `onedep_lib.config.DepositConfig.load()`. The installed library inspected for these docs uses `~/.config/onedep/config.toml`.
+The details of onedep_lib config can be found here: https://wwpdb.github.io/onedep_lib/usage/#config-file
+
 
 Local sessions default to `~/.onedep/sessions`; `session_dir` can be configured through the library. The toolkit does not expose a `--session-dir` flag. Resume needs those local files and the saved UUID, not just the remote deposition ID. Library configuration behavior is dependency-owned and should be rechecked when upgrading `onedep-lib`.
 
