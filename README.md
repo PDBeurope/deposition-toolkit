@@ -30,12 +30,12 @@ uv run deposition-toolkit submission-report "$WORK_DIR" G_01
 uv run deposition-toolkit mmcif-validation "$WORK_DIR"
 uv run deposition-toolkit analyse-chains "$WORK_DIR"
 uv run deposition-toolkit enrich-metadata "$WORK_DIR" /input/metadata.json
+uv run deposition-toolkit resolution-cleanup "$WORK_DIR"
 
 uv run deposition-toolkit ccd-creation "$WORK_DIR"
 uv run deposition-toolkit ccd-annotate "$WORK_DIR"
 uv run deposition-toolkit ccd-finalise "$WORK_DIR" --allocate-codes
 uv run deposition-toolkit lig-rename "$WORK_DIR"
-uv run deposition-toolkit resolution-cleanup "$WORK_DIR"
 
 uv run deposition-toolkit mmcif-validation "$WORK_DIR"
 uv run deposition-toolkit deposit "$WORK_DIR"
