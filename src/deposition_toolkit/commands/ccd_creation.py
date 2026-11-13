@@ -17,6 +17,10 @@ from .shared import (
 def register(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("ccd-creation", help="Stage 1: Create CCD CIFs per structure.")
     parser.add_argument("work_dir")
+    parser.add_argument(
+        "--audit-details",
+        help="Audit details for generated CCDs. Defaults to 'Created for OpenBind'.",
+    )
     parser.set_defaults(func=run)
 
 
@@ -39,6 +43,7 @@ def run(args: argparse.Namespace) -> int:
                 builder = CcdDirectoryBuilder(
                     input_dir=structure_dir,
                     output_dir=output_dir,
+                    audit_details=args.audit_details,
                 )
                 outputs = builder.run()
             if outputs:

@@ -145,6 +145,11 @@ def parse_args() -> argparse.Namespace:
         help="Directory for generated CIFs. Defaults to <input-dir>/generated_ccd_inputs.",
     )
     parser.add_argument(
+        "--audit-details",
+        default=AUDIT_DETAILS,
+        help="Audit details for generated CCDs. Defaults to '%(default)s'.",
+    )
+    parser.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -162,7 +167,7 @@ def main() -> int:
 
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir) if args.output_dir else input_dir / "generated_ccd_inputs"
-    builder = CcdDirectoryBuilder(input_dir=input_dir, output_dir=output_dir)
+    builder = CcdDirectoryBuilder(input_dir=input_dir, output_dir=output_dir, audit_details=args.audit_details)
     outputs = builder.run()
 
     LOGGER.info("Generated %s CCD-style CIF file(s) in %s", len(outputs), output_dir)
@@ -174,9 +179,10 @@ def main() -> int:
 class CcdDirectoryBuilder:
     """Convert a directory of coordinate/restraint CIFs into CCD-style output files."""
 
-    def __init__(self, input_dir: Path, output_dir: Path):
+    def __init__(self, input_dir: Path, output_dir: Path, audit_details: str | None = None):
         self.input_dir = input_dir
         self.output_dir = output_dir
+        self.audit_details = AUDIT_DETAILS if audit_details is None else audit_details
 
     def run(self) -> list[Path]:
         self._validate_directories()
@@ -217,6 +223,7 @@ class CcdDirectoryBuilder:
                 rdkit_analysis = _analyze_ligand_with_rdkit(restraint, instance, diagram_path)
                 _log_rdkit_analysis(instance, rdkit_analysis)
                 output_document = _build_output_document(
+                    audit_details=self.audit_details,
                     chem_comp=_build_chem_comp(restraint.comp_id, instance),
                     chem_comp_atom=_build_chem_comp_atom_rows(
                         restraint_atoms=list(restraint.atoms),
@@ -597,7 +604,10 @@ def _build_chem_comp_bond_rows(
     return output_rows
 
 
-def _build_chem_comp_audit_rows(chem_comp: ChemCompRow) -> list[dict[str, str | None]]:
+def _build_chem_comp_audit_rows(
+    chem_comp: ChemCompRow,
+    audit_details: str = AUDIT_DETAILS,
+) -> list[dict[str, str | None]]:
     return [
         {
             "comp_id": chem_comp.comp_id,
@@ -605,7 +615,7 @@ def _build_chem_comp_audit_rows(chem_comp: ChemCompRow) -> list[dict[str, str | 
             "date": chem_comp.pdbx_initial_date,
             "processing_site": AUDIT_PROCESSING_SITE,
             "annotator": AUDIT_ANNOTATOR,
-            "details": AUDIT_DETAILS,
+            "details": audit_details,
         }
     ]
 
@@ -664,6 +674,7 @@ def _build_output_document(
     chem_comp: ChemCompRow,
     chem_comp_atom: list[dict[str, str]],
     chem_comp_bond: list[dict[str, str]],
+    audit_details: str = AUDIT_DETAILS,
 ) -> gemmi.cif.Document:
     document = gemmi.cif.Document()
     block = document.add_new_block(chem_comp.comp_id)
@@ -686,7 +697,7 @@ def _build_output_document(
     block.set_mmcif_category(
         "_pdbx_chem_comp_audit.",
         _rows_to_category(
-            _build_chem_comp_audit_rows(chem_comp),
+            _build_chem_comp_audit_rows(chem_comp, audit_details),
             [
                 "comp_id",
                 "action_type",

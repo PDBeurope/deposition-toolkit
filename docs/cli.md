@@ -20,7 +20,7 @@ Global `--verbose` precedes the command and enables DEBUG wrapper logging. Stage
 | `mmcif-validation <work-dir>` | `--dictionary` / `-d` configured dictionary | [Validation](commands/mmcif-validation.md) |
 | `analyse-chains <work-dir>` | `--verbose-chains` / `-v` | [Chains](commands/analyse-chains.md) |
 | `enrich-metadata <work-dir> <metadata-json>` | `--entry-id model`; `--dictionary` configured dictionary; `--skip-validation` | [Enrichment](commands/enrich-metadata.md) |
-| `ccd-creation <work-dir>` | None | [Creation](commands/ccd-creation.md) |
+| `ccd-creation <work-dir>` | `--audit-details TEXT` | [Creation](commands/ccd-creation.md) |
 | `ccd-annotate <work-dir>` | `--annotate-bin` configured/derived executable | [Annotation](commands/ccd-annotate.md) |
 | `ccd-finalise <work-dir>` | See complete option table below | [Finalisation](commands/ccd-finalise.md) |
 | `lig-rename <work-dir>` | `--summary-csv` optional per-ligand code override | [Renaming](commands/lig-rename.md) |
