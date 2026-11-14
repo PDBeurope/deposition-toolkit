@@ -6,7 +6,7 @@ from pathlib import Path
 from deposition_toolkit.config import get_settings
 from deposition_toolkit.stages.common.manifest import find_coordinate_files, update_step
 
-from .shared import STEP_METADATA_ENRICHMENT, LOGGER, relative_outputs, require_structures, results_path
+from .shared import print_run_summary, structure_log, STEP_METADATA_ENRICHMENT, LOGGER, relative_outputs, require_structures, results_path
 
 
 def register(subparsers: argparse._SubParsersAction) -> None:
@@ -36,43 +36,49 @@ def run(args: argparse.Namespace) -> int:
     dictionary_path = None if args.skip_validation else Path(args.dictionary).expanduser().resolve()
     any_failed = False
     for structure_dir in structure_dirs:
-        coordinate_files = find_coordinate_files(structure_dir)
-        outputs: list[Path] = []
-        errors: list[str] = []
-        validation_errors = 0
-        validation_warnings = 0
-        if not coordinate_files:
-            errors.append("No coordinate CIF files found.")
-        for cif_path in coordinate_files:
-            validation_log = log_dir / structure_dir.name / f"{cif_path.stem}_validation_errors.txt"
-            try:
-                result = enrich_cif_file(
-                    cif_path,
-                    metadata_json,
-                    cif_path,
-                    entry_id=args.entry_id,
-                    dictionary_path=dictionary_path,
-                    validation_log_path=validation_log,
-                )
-                outputs.append(Path(result["output_cif"]))
-                if result.get("validation_log"):
-                    outputs.append(Path(result["validation_log"]))
-                validation_errors += int(result.get("validation_errors", 0))
-                validation_warnings += int(result.get("validation_warnings", 0))
-            except BaseException as exc:
-                errors.append(f"{cif_path.name}: {type(exc).__name__}: {exc}")
+        with structure_log(work_dir, structure_dir, STEP_METADATA_ENRICHMENT):
+            coordinate_files = find_coordinate_files(structure_dir)
+            outputs: list[Path] = []
+            errors: list[str] = []
+            validation_errors = 0
+            validation_warnings = 0
+            if not coordinate_files:
+                errors.append("No coordinate CIF files found.")
+            for cif_path in coordinate_files:
+                validation_log = log_dir / structure_dir.name / f"{cif_path.stem}_validation_errors.txt"
+                try:
+                    result = enrich_cif_file(
+                        cif_path,
+                        metadata_json,
+                        cif_path,
+                        entry_id=args.entry_id,
+                        dictionary_path=dictionary_path,
+                        validation_log_path=validation_log,
+                    )
+                    outputs.append(Path(result["output_cif"]))
+                    if result.get("validation_log"):
+                        outputs.append(Path(result["validation_log"]))
+                    validation_errors += int(result.get("validation_errors", 0))
+                    validation_warnings += int(result.get("validation_warnings", 0))
+                except (Exception, SystemExit) as exc:
+                    LOGGER.exception("Enrichment failed for %s", cif_path)
+                    errors.append(f"{cif_path.name}: {type(exc).__name__}: {exc}")
 
-        status = "done" if not errors and validation_errors == 0 else "failed"
-        any_failed = any_failed or status == "failed"
-        update_step(
-            structure_dir,
-            STEP_METADATA_ENRICHMENT,
-            status,
-            outputs=relative_outputs(outputs, work_dir),
-            error="; ".join(errors) if errors else None,
-            extra={
-                "validation_errors": validation_errors,
-                "validation_warnings": validation_warnings,
-            },
-        )
-    return 1 if any_failed else 0
+            status = "done" if not errors and validation_errors == 0 else "failed"
+            any_failed = any_failed or status == "failed"
+            update_step(
+                structure_dir,
+                STEP_METADATA_ENRICHMENT,
+                status,
+                outputs=relative_outputs(outputs, work_dir),
+                error="; ".join(errors) if errors else None,
+                extra={
+                    "coordinate_files": len(coordinate_files),
+                    "enriched_files": sum(path in coordinate_files for path in outputs),
+                    "validation_skipped": args.skip_validation,
+                    "validation_errors": validation_errors,
+                    "validation_warnings": validation_warnings,
+                },
+            )
+    failed = print_run_summary(work_dir, STEP_METADATA_ENRICHMENT, structure_dirs)
+    return 1 if any_failed or failed else 0

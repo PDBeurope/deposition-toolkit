@@ -19,7 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="deposition-toolkit",
         description="Wrapper for deposition preparation, CCD processing, and upload stages.",
     )
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose wrapper logging.")
+    parser.add_argument("--verbose", action="store_true", help="Show detailed live diagnostics as well as the concise summary.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     for command_module in COMMAND_MODULES:
         command_module.register(subparsers)

@@ -7,7 +7,7 @@ from deposition_toolkit.config import get_settings
 from deposition_toolkit.stages.ccd_creation.annotate_comp import annotate_file
 from deposition_toolkit.stages.common.manifest import relative_to_work_dir, update_step
 
-from .shared import STEP_CCD_ANNOTATE, relative_outputs, require_structures, results_path
+from .shared import print_run_summary, structure_log, STEP_CCD_ANNOTATE, relative_outputs, require_structures, results_path
 
 
 def register(subparsers: argparse._SubParsersAction) -> None:
@@ -28,47 +28,49 @@ def run(args: argparse.Namespace) -> int:
     log_root = results_path(work_dir, "logs", "ccd_annotate")
     any_failed = False
     for structure_dir in structure_dirs:
-        stage_input = input_root / structure_dir.name
-        input_files = sorted(stage_input.glob("*.cif")) if stage_input.is_dir() else []
-        if not input_files:
+        with structure_log(work_dir, structure_dir, STEP_CCD_ANNOTATE):
+            stage_input = input_root / structure_dir.name
+            input_files = sorted(stage_input.glob("*.cif")) if stage_input.is_dir() else []
+            if not input_files:
+                update_step(
+                    structure_dir,
+                    STEP_CCD_ANNOTATE,
+                    "not applicable",
+                    error=f"No stage-1 CCD CIF files found in {stage_input}",
+                )
+                continue
+
+            results = [
+                annotate_file(
+                    input_file,
+                    output_root / structure_dir.name / input_file.name,
+                    annotate_bin=Path(args.annotate_bin),
+                    log_dir=log_root / structure_dir.name,
+                )
+                for input_file in input_files
+            ]
+            failures = [result for result in results if result.status != "done"]
+            any_failed = any_failed or bool(failures)
             update_step(
                 structure_dir,
                 STEP_CCD_ANNOTATE,
-                "not applicable",
-                error=f"No stage-1 CCD CIF files found in {stage_input}",
+                "failed" if failures else "done",
+                outputs=relative_outputs([result.output_file for result in results if result.output_file.exists()], work_dir),
+                error="; ".join(result.error for result in failures) if failures else None,
+                extra={
+                    "files": [
+                        {
+                            "input": relative_to_work_dir(result.input_file, work_dir),
+                            "output": relative_to_work_dir(result.output_file, work_dir),
+                            "status": result.status,
+                            "returncodes": list(result.returncodes),
+                            "round1_log": relative_to_work_dir(result.round1_log, work_dir),
+                            "round2_log": relative_to_work_dir(result.round2_log, work_dir),
+                            "error": result.error,
+                        }
+                        for result in results
+                    ]
+                },
             )
-            continue
-
-        results = [
-            annotate_file(
-                input_file,
-                output_root / structure_dir.name / input_file.name,
-                annotate_bin=Path(args.annotate_bin),
-                log_dir=log_root / structure_dir.name,
-            )
-            for input_file in input_files
-        ]
-        failures = [result for result in results if result.status != "done"]
-        any_failed = any_failed or bool(failures)
-        update_step(
-            structure_dir,
-            STEP_CCD_ANNOTATE,
-            "failed" if failures else "done",
-            outputs=relative_outputs([result.output_file for result in results if result.output_file.exists()], work_dir),
-            error="; ".join(result.error for result in failures) if failures else None,
-            extra={
-                "files": [
-                    {
-                        "input": relative_to_work_dir(result.input_file, work_dir),
-                        "output": relative_to_work_dir(result.output_file, work_dir),
-                        "status": result.status,
-                        "returncodes": list(result.returncodes),
-                        "round1_log": relative_to_work_dir(result.round1_log, work_dir),
-                        "round2_log": relative_to_work_dir(result.round2_log, work_dir),
-                        "error": result.error,
-                    }
-                    for result in results
-                ]
-            },
-        )
-    return 1 if any_failed else 0
+    failed = print_run_summary(work_dir, STEP_CCD_ANNOTATE, structure_dirs)
+    return 1 if any_failed or failed else 0

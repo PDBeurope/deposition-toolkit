@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import logging
 import tempfile
 from collections import defaultdict
 from pathlib import Path
@@ -9,6 +10,8 @@ from pathlib import Path
 from deposition_toolkit.stages.common.manifest import load_manifest, set_top_level_fields, update_step
 
 from .shared import (
+    print_run_summary,
+    structure_log,
     STEP_CCD_FINALISE,
     LOGGER,
     relative_outputs,
@@ -93,6 +96,8 @@ def run(args: argparse.Namespace) -> int:
 
     final_dir = results_path(work_dir, "ccd", "final")
     argv = finalizer_argv(args, final_dir)
+    if not logging.getLogger().isEnabledFor(logging.DEBUG) and not args.debug:
+        argv.append("--quiet")
     if args.commit_only:
         return int(finalize_ccds.main(argv))
 
@@ -106,14 +111,16 @@ def run(args: argparse.Namespace) -> int:
                 symlink_or_copytree(stage_dir, filtered_root / structure_dir.name)
                 active_stage_dirs.append(structure_dir)
             else:
-                update_step(
-                    structure_dir,
-                    STEP_CCD_FINALISE,
-                    "not applicable",
-                    error=f"No stage-2 CCD directory found in {stage_dir}",
-                )
+                with structure_log(work_dir, structure_dir, STEP_CCD_FINALISE):
+                    update_step(
+                        structure_dir,
+                        STEP_CCD_FINALISE,
+                        "not applicable",
+                        error=f"No stage-2 CCD directory found in {stage_dir}",
+                    )
         if not active_stage_dirs:
             LOGGER.warning("No active stage-2 CCD directories found under %s", input_root)
+            print_run_summary(work_dir, STEP_CCD_FINALISE, structure_dirs)
             return 0
         argv.extend(["--input-root", str(filtered_root)])
         exit_code = finalize_ccds.main(argv)
@@ -134,58 +141,60 @@ def run(args: argparse.Namespace) -> int:
     ]
     any_failed = bool(exit_code)
     for structure_dir in structure_dirs:
-        rows = rows_by_structure.get(structure_dir.name, [])
-        if not rows:
-            if (input_root / structure_dir.name).is_dir():
-                any_failed = True
-                update_step(
-                    structure_dir,
-                    STEP_CCD_FINALISE,
-                    "failed",
-                    outputs=relative_outputs([path for path in common_outputs if path.exists()], work_dir),
-                    error="No finalisation rows were written for this structure.",
-                )
-            continue
-        ligands = load_manifest(structure_dir).get("ccd_ligands", [])
-        mapping_errors = []
-        by_name = defaultdict(list)
-        for row in rows:
-            by_name[row.get("ligand_name", "")].append(row)
-        known_names = {ligand["ligand_name"] for ligand in ligands}
-        for name in by_name.keys() - known_names:
-            mapping_errors.append(f"No atom-site provenance for {name}; rerun ccd-creation and ccd-annotate.")
-        for ligand in ligands:
-            matches = by_name.get(ligand["ligand_name"], [])
-            if len(matches) != 1:
-                mapping_errors.append(f"Expected one finalisation row for {ligand['ligand_name']}, found {len(matches)}.")
+        with structure_log(work_dir, structure_dir, STEP_CCD_FINALISE):
+            rows = rows_by_structure.get(structure_dir.name, [])
+            if not rows:
+                if (input_root / structure_dir.name).is_dir():
+                    any_failed = True
+                    update_step(
+                        structure_dir,
+                        STEP_CCD_FINALISE,
+                        "failed",
+                        outputs=relative_outputs([path for path in common_outputs if path.exists()], work_dir),
+                        error="No finalisation rows were written for this structure.",
+                    )
                 continue
-            row = matches[0]
-            ligand["finalisation"] = {key: row[key] for key in ("status", "inchi_key", "deposit") if key in row}
-            if finalize_ccds.is_real_ccd_id(row.get("CCD", "")) and row.get("status") != "missing_inchikey":
-                ligand["CCD"] = row["CCD"]
-        if mapping_errors:
+            ligands = load_manifest(structure_dir).get("ccd_ligands", [])
+            mapping_errors = []
+            by_name = defaultdict(list)
+            for row in rows:
+                by_name[row.get("ligand_name", "")].append(row)
+            known_names = {ligand["ligand_name"] for ligand in ligands}
+            for name in by_name.keys() - known_names:
+                mapping_errors.append(f"No atom-site provenance for {name}; rerun ccd-creation and ccd-annotate.")
             for ligand in ligands:
-                ligand.pop("CCD", None)
-        set_top_level_fields(structure_dir, ccd_ligands=ligands)
-        problem_rows = [
-            row
-            for row in rows
-            if not row.get("CCD")
-            or not finalize_ccds.is_real_ccd_id(row.get("CCD", ""))
-            or row.get("status") == "missing_inchikey"
-        ]
-        ccds = sorted({row.get("CCD", "") for row in rows if row.get("CCD", "")})
-        status = "failed" if problem_rows or mapping_errors or exit_code else "done"
-        any_failed = any_failed or status == "failed"
-        update_step(
-            structure_dir,
-            STEP_CCD_FINALISE,
-            status,
-            outputs=relative_outputs([path for path in common_outputs if path.exists()], work_dir),
-            error="; ".join(([f"{len(problem_rows)} ligand row(s) need attention."] if problem_rows else []) + mapping_errors) or None,
-            extra={
-                "ccd_keys": ccds,
-                "ligands": rows,
-            },
-        )
-    return 1 if any_failed else 0
+                matches = by_name.get(ligand["ligand_name"], [])
+                if len(matches) != 1:
+                    mapping_errors.append(f"Expected one finalisation row for {ligand['ligand_name']}, found {len(matches)}.")
+                    continue
+                row = matches[0]
+                ligand["finalisation"] = {key: row[key] for key in ("status", "inchi_key", "deposit") if key in row}
+                if finalize_ccds.is_real_ccd_id(row.get("CCD", "")) and row.get("status") != "missing_inchikey":
+                    ligand["CCD"] = row["CCD"]
+            if mapping_errors:
+                for ligand in ligands:
+                    ligand.pop("CCD", None)
+            set_top_level_fields(structure_dir, ccd_ligands=ligands)
+            problem_rows = [
+                row
+                for row in rows
+                if not row.get("CCD")
+                or not finalize_ccds.is_real_ccd_id(row.get("CCD", ""))
+                or row.get("status") == "missing_inchikey"
+            ]
+            ccds = sorted({row.get("CCD", "") for row in rows if row.get("CCD", "")})
+            status = "failed" if problem_rows or mapping_errors or exit_code else "done"
+            any_failed = any_failed or status == "failed"
+            update_step(
+                structure_dir,
+                STEP_CCD_FINALISE,
+                status,
+                outputs=relative_outputs([path for path in common_outputs if path.exists()], work_dir),
+                error="; ".join(([f"{len(problem_rows)} ligand row(s) need attention."] if problem_rows else []) + mapping_errors) or None,
+                extra={
+                    "ccd_keys": ccds,
+                    "ligands": rows,
+                },
+            )
+    failed = print_run_summary(work_dir, STEP_CCD_FINALISE, structure_dirs)
+    return 1 if any_failed or failed else 0

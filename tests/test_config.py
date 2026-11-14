@@ -153,7 +153,7 @@ class StageConfigurationTests(unittest.TestCase):
                 with (
                     self.subTest(kwargs=kwargs),
                     patch.object(enrich_cif.gemmi.cif, "read_file"),
-                    patch.multiple(enrich_cif, CifDataStorage=DEFAULT, normalize_entry_id=DEFAULT,
+                    patch.multiple(enrich_cif, CifDataStorage=DEFAULT, CifSequenceUpdater=DEFAULT, normalize_entry_id=DEFAULT,
                                    normalize_ids=DEFAULT, enrich_from_json=DEFAULT, enrich_chem_comp=DEFAULT),
                     patch("validate_mmcif.validate", return_value=[]) as validate,
                 ):

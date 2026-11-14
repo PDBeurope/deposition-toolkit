@@ -679,10 +679,13 @@ def write_result_json(
     logger.info("Wrote CCD processing result JSON to %s", path)
 
 
-def configure_logging(output_dir: Path, level: int) -> Path:
+def configure_logging(output_dir: Path, level: int, *, quiet: bool = False) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     log_path = output_dir / "ccd_processing.log"
     logger.setLevel(level)
+    logger.propagate = False
+    for handler in logger.handlers:
+        handler.close()
     logger.handlers = []
 
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -693,7 +696,7 @@ def configure_logging(output_dir: Path, level: int) -> Path:
 
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(logging.Formatter("%(levelname)s:%(message)s"))
-    console_handler.setLevel(level)
+    console_handler.setLevel(logging.WARNING if quiet else level)
     logger.addHandler(console_handler)
     return log_path
 
@@ -701,7 +704,7 @@ def configure_logging(output_dir: Path, level: int) -> Path:
 def run_processing(args: argparse.Namespace) -> int:
     input_root = Path(args.input_root).expanduser().resolve()
     output_dir = Path(args.output_dir).expanduser().resolve()
-    log_path = configure_logging(output_dir, logging.DEBUG if args.debug else logging.INFO)
+    log_path = configure_logging(output_dir, logging.DEBUG if args.debug else logging.INFO, quiet=getattr(args, "quiet", False))
 
     logger.info("CCD finalization log: %s", log_path)
     logger.info("Input CCD root: %s", input_root)
@@ -776,7 +779,7 @@ def run_processing(args: argparse.Namespace) -> int:
 
 def run_commit_only(args: argparse.Namespace) -> int:
     output_dir = Path(args.output_dir).expanduser().resolve()
-    log_path = configure_logging(output_dir, logging.DEBUG if args.debug else logging.INFO)
+    log_path = configure_logging(output_dir, logging.DEBUG if args.debug else logging.INFO, quiet=getattr(args, "quiet", False))
     logger.info("CCD finalization commit-only log: %s", log_path)
     if not args.commit_folder:
         raise RuntimeError("--commit-folder is required with --commit-only")
@@ -871,6 +874,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--db-user", default=settings.ccd_db_user)
     parser.add_argument("--db-password", default=settings.ccd_db_password.get_secret_value())
     parser.add_argument("--db-timeout", type=int, default=settings.ccd_db_timeout)
+    parser.add_argument("--quiet", action="store_true", help="Show only warnings and errors on the console.")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging.")
     return parser
 

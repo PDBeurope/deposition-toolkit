@@ -11,7 +11,7 @@ from deposition_toolkit.stages.common.manifest import (
     update_step,
 )
 
-from .shared import STEP_ANALYSE_CHAINS, require_structures, results_path
+from .shared import print_run_summary, structure_log, STEP_ANALYSE_CHAINS, require_structures, results_path
 
 
 def register(subparsers: argparse._SubParsersAction) -> None:
@@ -32,64 +32,66 @@ def run(args: argparse.Namespace) -> int:
     log_dir = results_path(work_dir, "logs", "analyse_chains")
     any_failed = False
     for structure_dir in structure_dirs:
-        logger = logging.getLogger(f"analyse_chains.{structure_dir.name}")
-        logger.setLevel(logging.INFO)
-        logger.handlers.clear()
-        file_handler = logging.FileHandler(log_dir / f"{structure_dir.name}.log", encoding="utf-8")
-        file_handler.setFormatter(logging.Formatter("%(message)s"))
-        logger.addHandler(file_handler)
-        coordinate_files = find_coordinate_files(structure_dir)
-        details = []
-        errors = []
-        total_polymer_chains = 0
-        try:
-            for cif_path in coordinate_files:
-                chains, error, has_coordinates = analysis_polymer_chains.process_single_file(
-                    cif_path,
-                    verbose=args.verbose_chains,
-                    logger=logger,
-                )
-                if error:
-                    errors.append(error)
-                    continue
-                if has_coordinates and chains is not None:
-                    total_polymer_chains += len(chains)
-                    details.append(
-                        {
-                            "file": relative_to_work_dir(cif_path, work_dir),
-                            "polymer_chain_count": len(chains),
-                            "chains": chains,
-                        }
+        with structure_log(work_dir, structure_dir, STEP_ANALYSE_CHAINS):
+            logger = logging.getLogger(f"analyse_chains.{structure_dir.name}")
+            logger.setLevel(logging.INFO)
+            logger.handlers.clear()
+            file_handler = logging.FileHandler(log_dir / f"{structure_dir.name}.log", encoding="utf-8")
+            file_handler.setFormatter(logging.Formatter("%(message)s"))
+            logger.addHandler(file_handler)
+            coordinate_files = find_coordinate_files(structure_dir)
+            details = []
+            errors = []
+            total_polymer_chains = 0
+            try:
+                for cif_path in coordinate_files:
+                    chains, error, has_coordinates = analysis_polymer_chains.process_single_file(
+                        cif_path,
+                        verbose=args.verbose_chains,
+                        logger=logger,
                     )
-            if not coordinate_files:
-                errors.append("No coordinate CIF files found.")
-        finally:
-            logger.removeHandler(file_handler)
-            file_handler.close()
+                    if error:
+                        errors.append(error)
+                        continue
+                    if has_coordinates and chains is not None:
+                        total_polymer_chains += len(chains)
+                        details.append(
+                            {
+                                "file": relative_to_work_dir(cif_path, work_dir),
+                                "polymer_chain_count": len(chains),
+                                "chains": chains,
+                            }
+                        )
+                if not coordinate_files:
+                    errors.append("No coordinate CIF files found.")
+            finally:
+                logger.removeHandler(file_handler)
+                file_handler.close()
 
-        if errors:
-            status = "failed"
-            chain_label = ""
-            any_failed = True
-        elif total_polymer_chains == 1:
-            status = "done"
-            chain_label = "single"
-        elif total_polymer_chains > 1:
-            status = "done"
-            chain_label = "multiple"
-        else:
-            status = "done"
-            chain_label = "none"
-        set_top_level_fields(structure_dir, chains=chain_label)
-        update_step(
-            structure_dir,
-            STEP_ANALYSE_CHAINS,
-            status,
-            output=relative_to_work_dir(log_dir / f"{structure_dir.name}.log", work_dir),
-            error="; ".join(errors) if errors else None,
-            extra={
-                "polymer_chain_count": total_polymer_chains,
-                "files": details,
-            },
-        )
-    return 1 if any_failed else 0
+            if errors:
+                status = "failed"
+                chain_label = ""
+                any_failed = True
+            elif total_polymer_chains == 1:
+                status = "done"
+                chain_label = "single"
+            elif total_polymer_chains > 1:
+                status = "done"
+                chain_label = "multiple"
+            else:
+                status = "done"
+                chain_label = "none"
+            set_top_level_fields(structure_dir, chains=chain_label)
+            update_step(
+                structure_dir,
+                STEP_ANALYSE_CHAINS,
+                status,
+                output=relative_to_work_dir(log_dir / f"{structure_dir.name}.log", work_dir),
+                error="; ".join(errors) if errors else None,
+                extra={
+                    "polymer_chain_count": total_polymer_chains,
+                    "files": details,
+                },
+            )
+    failed = print_run_summary(work_dir, STEP_ANALYSE_CHAINS, structure_dirs)
+    return 1 if any_failed or failed else 0

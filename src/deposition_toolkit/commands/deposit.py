@@ -19,6 +19,8 @@ from deposition_toolkit.stages.deposit.deposition import (
 )
 
 from .shared import (
+    print_run_summary,
+    structure_log,
     STEP_DEPOSITION,
     dataclass_to_dict,
     require_structures,
@@ -64,58 +66,75 @@ def run(
 
     log_root = results_path(work_dir, "logs", "deposition")
     any_failed = False
+    processed = []
     for structure_dir in structure_dirs:
-        manifest = load_manifest(structure_dir)
-        session_id = None
-        if not args.dry_run:
-            try:
-                session_id = lookup(dataset_from_manifest(manifest), manifest["structure_id"])
-            except (ValueError, SQLAlchemyError):
-                LOGGER.error(
-                    "Deposition registry lookup failed for %s. Check database settings, "
-                    "migrations, manifest identity and saved session availability; no upload was started.",
-                    manifest["structure_id"],
+        processed.append(structure_dir)
+        with structure_log(work_dir, structure_dir, STEP_DEPOSITION):
+            manifest = load_manifest(structure_dir)
+            session_id = None
+            if not args.dry_run:
+                try:
+                    session_id = lookup(dataset_from_manifest(manifest), manifest["structure_id"])
+                except (ValueError, SQLAlchemyError):
+                    LOGGER.error(
+                        "Deposition registry lookup failed for %s. Check database settings, "
+                        "migrations, manifest identity and saved session availability; no upload was started.",
+                        manifest["structure_id"],
+                    )
+                    update_step(
+                        structure_dir, STEP_DEPOSITION, "failed",
+                        error="Deposition registry lookup failed; no upload was started.",
+                    )
+                    any_failed = True
+                    break
+            log_path = log_root / f"{structure_dir.name}.log"
+            with stage_log_handler(DEPOSITION_LOGGER, log_path):
+                result = deposit_structure(
+                    structure_dir,
+                    session_id=session_id,
+                    email=args.email,
+                    users=args.users,
+                    country=args.country,
+                    experiment_type=args.experiment_type,
+                    poll=not args.no_poll,
+                    poll_interval=args.poll_interval,
+                    max_polls=args.max_polls,
+                    dry_run=args.dry_run,
                 )
-                return 1
-        log_path = log_root / f"{structure_dir.name}.log"
-        with stage_log_handler(DEPOSITION_LOGGER, log_path):
-            result = deposit_structure(
-                structure_dir,
-                session_id=session_id,
-                email=args.email,
-                users=args.users,
-                country=args.country,
-                experiment_type=args.experiment_type,
-                poll=not args.no_poll,
-                poll_interval=args.poll_interval,
-                max_polls=args.max_polls,
-                dry_run=args.dry_run,
-            )
-        result_dict = dataclass_to_dict(result)
-        any_failed = any_failed or result.status == "failed"
-        if result.deposition_id:
-            set_top_level_fields(
-                structure_dir,
-                deposition_id=result.deposition_id,
-                session_id=result.session_id,
-            )
-            result_dict["deposition_record"] = result.to_record()
-        update_step(
-            structure_dir,
-            STEP_DEPOSITION,
-            result.status,
-            output=relative_to_work_dir(log_path, work_dir),
-            error=result.error or None,
-            extra=result_dict,
-        )
-        if not args.dry_run and result.deposition_id and result.session_id:
-            try:
-                save_deposition(result.to_record())
-            except (ValueError, SQLAlchemyError):
-                LOGGER.error(
-                    "Could not save deposition registry entry for %s. Deposition %s and session %s "
-                    "are saved in its manifest; reconcile the registry before retrying.",
-                    result.structure_id, result.deposition_id, result.session_id,
+            result_dict = dataclass_to_dict(result)
+            any_failed = any_failed or result.status == "failed"
+            if result.deposition_id:
+                set_top_level_fields(
+                    structure_dir,
+                    deposition_id=result.deposition_id,
+                    session_id=result.session_id,
                 )
-                return 1
-    return 1 if any_failed else 0
+                result_dict["deposition_record"] = result.to_record()
+            update_step(
+                structure_dir,
+                STEP_DEPOSITION,
+                result.status,
+                output=relative_to_work_dir(log_path, work_dir),
+                error=result.error or None,
+                extra=result_dict,
+            )
+            if not args.dry_run and result.deposition_id and result.session_id:
+                try:
+                    save_deposition(result.to_record())
+                except (ValueError, SQLAlchemyError):
+                    LOGGER.error(
+                        "Could not save deposition registry entry for %s. Deposition %s and session %s "
+                        "are saved in its manifest; reconcile the registry before retrying.",
+                        result.structure_id, result.deposition_id, result.session_id,
+                    )
+                    update_step(
+                        structure_dir, STEP_DEPOSITION, "failed",
+                        error="Registry save failed; reconcile the registry before retrying.",
+                        extra={**result_dict, "status": "failed"},
+                    )
+                    any_failed = True
+                    break
+    if len(processed) < len(structure_dirs):
+        print(f"Stopped early: {len(structure_dirs) - len(processed)} structures not run.")
+    failed = print_run_summary(work_dir, STEP_DEPOSITION, processed)
+    return 1 if any_failed or failed else 0

@@ -679,7 +679,7 @@ def enrich_cif_file(
     enrich_chem_comp(storage)
     storage.write_to_cif(str(output_cif), block_name=entry_id)
 
-    updater = CifSequenceUpdater(output_cif, output_cif)
+    updater = CifSequenceUpdater(str(output_cif), str(output_cif))
     updater.process()
 
     result: dict[str, Any] = {

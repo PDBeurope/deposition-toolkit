@@ -6,7 +6,7 @@ from pathlib import Path
 from deposition_toolkit.config import get_settings
 from deposition_toolkit.stages.prepare_dataset.prepare_dataset import prepare_dataset
 
-from .shared import LOGGER
+from .shared import STEP_PREPARE, print_run_summary, structure_log
 
 
 def register(subparsers: argparse._SubParsersAction) -> None:
@@ -31,5 +31,8 @@ def run(args: argparse.Namespace) -> int:
         extract=not args.no_extract,
     )
     print(result.work_dir)
-    LOGGER.info("Prepared %d structure directorie(s)", len(result.structure_dirs))
+    for structure_dir in result.structure_dirs:
+        with structure_log(result.work_dir, structure_dir, STEP_PREPARE):
+            pass
+    print_run_summary(result.work_dir, STEP_PREPARE, list(result.structure_dirs))
     return 0

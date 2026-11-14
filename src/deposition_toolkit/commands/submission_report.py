@@ -8,6 +8,8 @@ from typing import Any, Sequence
 from deposition_toolkit.stages.common.manifest import relative_to_work_dir, set_top_level_fields, update_step
 
 from .shared import (
+    print_run_summary,
+    structure_log,
     STEP_SUBMISSION_REPORT,
     relative_outputs,
     require_structures,
@@ -51,23 +53,25 @@ def run(args: argparse.Namespace) -> int:
 
     by_id = {result.structure_id: result for result in results}
     for structure_dir in structure_dirs:
-        structure = by_id[structure_dir.name]
-        messages = validation_summary.messages_for_structure(structure.structure_id)
-        status = dep_report.structure_status(structure, messages)
-        counts = dep_report.structure_counts(structure)
-        set_top_level_fields(structure_dir, group_id=args.group_id)
-        update_step(
-            structure_dir,
-            STEP_SUBMISSION_REPORT,
-            "done" if status.label == "OK" else "failed",
-            outputs=relative_outputs([structures_log, summary_pdf], work_dir),
-            extra={
-                "report_status": status.label,
-                "message": status.message or "",
-                "counts": counts,
-                "validation_messages": messages,
-            },
-        )
+        with structure_log(work_dir, structure_dir, STEP_SUBMISSION_REPORT):
+            structure = by_id[structure_dir.name]
+            messages = validation_summary.messages_for_structure(structure.structure_id)
+            status = dep_report.structure_status(structure, messages)
+            counts = dep_report.structure_counts(structure)
+            set_top_level_fields(structure_dir, group_id=args.group_id)
+            update_step(
+                structure_dir,
+                STEP_SUBMISSION_REPORT,
+                "done" if status.label == "OK" else "failed",
+                outputs=relative_outputs([structures_log, summary_pdf], work_dir),
+                extra={
+                    "report_status": status.label,
+                    "message": status.message or "",
+                    "counts": counts,
+                    "validation_messages": messages,
+                },
+            )
 
     print(relative_to_work_dir(summary_pdf, work_dir))
+    print_run_summary(work_dir, STEP_SUBMISSION_REPORT, structure_dirs)
     return 0

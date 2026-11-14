@@ -7,6 +7,8 @@ from pathlib import Path
 from deposition_toolkit.stages.common.manifest import find_matching_files, relative_to_work_dir, update_step
 
 from .shared import (
+    print_run_summary,
+    structure_log,
     STEP_RESOLUTION_CLEANUP,
     require_structures,
     results_path,
@@ -49,44 +51,46 @@ def run(args: argparse.Namespace) -> int:
         logging.DEBUG if args.verbose_resolution else logging.INFO,
     ):
         for structure_dir in structure_dirs:
-            files = find_matching_files(structure_dir, (pattern,))
-            if not files:
+            with structure_log(work_dir, structure_dir, STEP_RESOLUTION_CLEANUP):
+                files = find_matching_files(structure_dir, (pattern,))
+                if not files:
+                    update_step(
+                        structure_dir,
+                        STEP_RESOLUTION_CLEANUP,
+                        "not applicable",
+                        output=relative_to_work_dir(log_path, work_dir),
+                        error=f"No files matching {pattern!r}.",
+                    )
+                    continue
+                results = []
+                errors = []
+                for cif_file in files:
+                    result = resolution_cleanup.ResolutionWorkflow.process(
+                        cif_file,
+                        do_round=config.do_round,
+                        do_round_stats=config.do_round_stats,
+                        do_sort=config.do_sort,
+                        do_compare=config.do_compare,
+                        do_sync=config.do_sync,
+                        dry_run=args.dry_run,
+                        res_decimal_places=config.res_decimal_places,
+                        stats_decimal_places=config.stats_decimal_places,
+                        block_index=block_index,
+                        output_suffix=output_suffix,
+                    )
+                    result["file"] = relative_to_work_dir(cif_file, work_dir)
+                    results.append(result)
+                    if result.get("error"):
+                        errors.append(cif_file.name)
+                status = "failed" if errors else "done"
+                any_failed = any_failed or status == "failed"
                 update_step(
                     structure_dir,
                     STEP_RESOLUTION_CLEANUP,
-                    "not applicable",
+                    status,
                     output=relative_to_work_dir(log_path, work_dir),
-                    error=f"No files matching {pattern!r}.",
+                    error=f"Failed files: {', '.join(errors)}" if errors else None,
+                    extra={"files": results, "dry_run": args.dry_run},
                 )
-                continue
-            results = []
-            errors = []
-            for cif_file in files:
-                result = resolution_cleanup.ResolutionWorkflow.process(
-                    cif_file,
-                    do_round=config.do_round,
-                    do_round_stats=config.do_round_stats,
-                    do_sort=config.do_sort,
-                    do_compare=config.do_compare,
-                    do_sync=config.do_sync,
-                    dry_run=args.dry_run,
-                    res_decimal_places=config.res_decimal_places,
-                    stats_decimal_places=config.stats_decimal_places,
-                    block_index=block_index,
-                    output_suffix=output_suffix,
-                )
-                result["file"] = relative_to_work_dir(cif_file, work_dir)
-                results.append(result)
-                if result.get("error"):
-                    errors.append(cif_file.name)
-            status = "failed" if errors else "done"
-            any_failed = any_failed or status == "failed"
-            update_step(
-                structure_dir,
-                STEP_RESOLUTION_CLEANUP,
-                status,
-                output=relative_to_work_dir(log_path, work_dir),
-                error=f"Failed files: {', '.join(errors)}" if errors else None,
-                extra={"files": results, "dry_run": args.dry_run},
-            )
-    return 1 if any_failed else 0
+    failed = print_run_summary(work_dir, STEP_RESOLUTION_CLEANUP, structure_dirs)
+    return 1 if any_failed or failed else 0
