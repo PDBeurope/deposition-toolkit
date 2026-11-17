@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import DEFAULT, patch
+from unittest.mock import DEFAULT, MagicMock, patch
 
 from pydantic import ValidationError
 
@@ -117,6 +117,57 @@ class SettingsTests(unittest.TestCase):
 
 
 class StageConfigurationTests(unittest.TestCase):
+    def test_deposit_parsers_use_dotenv_environment_and_cli_overrides(self):
+        from deposition_toolkit.commands import deposit
+        from deposition_toolkit.stages.deposit import deposition
+
+        with configured_directory("WWPDB_EMAIL=dotenv@example.org\nWWPDB_USERS=dotenv-user,second-user\n"):
+            for environment, expected in (
+                ({}, ("dotenv@example.org", "dotenv-user,second-user")),
+                ({"WWPDB_EMAIL": "env@example.org", "WWPDB_USERS": "env-user"},
+                 ("env@example.org", "env-user")),
+            ):
+                with self.subTest(environment=environment), patch.dict(os.environ, environment):
+                    get_settings.cache_clear()
+                    parser = argparse.ArgumentParser()
+                    deposit.register(parser.add_subparsers())
+                    for parse, argv in ((parser.parse_args, ["deposit", "work"]),
+                                        (deposition.build_parser().parse_args, ["structure"])):
+                        args = parse(argv)
+                        self.assertEqual((args.email, args.users), expected)
+                        args = parse(argv + ["--email", "cli@example.org", "--users", "cli-user"])
+                        self.assertEqual((args.email, args.users), ("cli@example.org", "cli-user"))
+
+    def test_deposit_api_uses_dotenv_and_explicit_arguments(self):
+        from deposition_toolkit.stages.deposit import deposition
+
+        with configured_directory("WWPDB_EMAIL=dotenv@example.org\nWWPDB_USERS=first-user, second-user\n") as root:
+            library = MagicMock()
+            library.check_auth_key.return_value = False
+            config_module = MagicMock()
+            with (
+                patch.dict(sys.modules, {"onedep_lib": library, "onedep_lib.config": config_module}),
+                patch.object(deposition, "load_manifest", return_value={"structure_id": "test"}),
+                patch.object(deposition, "first_matching_file", return_value=root / "input.cif"),
+            ):
+                for kwargs, email, users in (
+                    ({}, "dotenv@example.org", ["first-user", "second-user"]),
+                    ({"email": "api@example.org", "users": ["api-user"]},
+                     "api@example.org", ["api-user"]),
+                ):
+                    with self.subTest(kwargs=kwargs):
+                        library.deposit_init.reset_mock()
+                        result = deposition.deposit_structure(root, **kwargs)
+                        self.assertEqual(result.error, "Auth key check failed.")
+                        self.assertEqual(library.deposit_init.call_args.kwargs["email"], email)
+                        self.assertEqual(library.deposit_init.call_args.kwargs["users"], users)
+                library.deposit_init.reset_mock()
+                for kwargs, error in (({"email": ""}, "WWPDB email is required."),
+                                      ({"users": ""}, "At least one WWPDB user id is required.")):
+                    with self.subTest(kwargs=kwargs):
+                        self.assertEqual(deposition.deposit_structure(root, **kwargs).error, error)
+                library.deposit_init.assert_not_called()
+
     def test_dictionary_defaults_and_overrides_across_command_and_stage_parsers(self):
         from deposition_toolkit.commands import enrich_metadata, mmcif_validation
         from deposition_toolkit.stages.metadata_enrichment import enrich_cif

@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     ccd_db_password: SecretStr = SecretStr("")
     ccd_db_timeout: int = Field(default=30, gt=0)
 
+    wwpdb_email: str = ""
+    wwpdb_users: str = ""
+
     # The ledger validates required connection values only when explicitly used.
     postgres_host: str = "pgsql-hlvm-172"
     postgres_port: int = Field(default=5432, ge=1, le=65535)

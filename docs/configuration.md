@@ -18,7 +18,7 @@ flowchart LR
     D --> E[Stage parameters]
 ```
 
-This hierarchy describes toolkit settings. `WWPDB_*` and the OneDep library use separate configuration paths, explained below. Pydantic loading `.env` does not export its entries into `os.environ`.
+This hierarchy also applies to `WWPDB_EMAIL` and `WWPDB_USERS`. OneDep authentication and session storage use the library configuration described below.
 
 ## Settings by stage
 
@@ -63,6 +63,8 @@ Defaults come from `src/deposition_toolkit/config.py`; `.env.example` is the edi
 | `POSTGRES_USER` | `pdb_dep` |
 | `POSTGRES_PASSWORD` | `place-holder`; replace for real ledger access |
 | `POSTGRES_DATABASE` | Unset/blank uses `POSTGRES_USER` |
+| `WWPDB_EMAIL` | Empty; depositor email for new depositions |
+| `WWPDB_USERS` | Empty; comma-separated WWPDB user IDs for new depositions |
 
 Passwords are `SecretStr` inside toolkit settings. Database adapters unwrap them only when creating client connections. `.env` is ignored by Git; do not include real credentials in documentation or command examples.
 
@@ -84,12 +86,14 @@ An executable override alone does not relocate those helper paths or the OpenEye
 
 ## OneDep identity, authentication and saved sessions
 
-The toolkit reads `WWPDB_EMAIL` and comma-separated `WWPDB_USERS` directly from the process environment. **Putting them only in the toolkit `.env` does not populate these defaults.** Use `--email` / `--users`, or export them:
+The toolkit reads `WWPDB_EMAIL` and comma-separated `WWPDB_USERS` through shared settings for the `deposit` command, standalone stage and Python API. Put them in `.env` in the current working directory:
 
 ```bash
-export WWPDB_EMAIL=depositor@example.org
-export WWPDB_USERS=0000-0002-8612-9539
+WWPDB_EMAIL=depositor@example.org
+WWPDB_USERS=0000-0002-8612-9539
 ```
+
+Exported environment values override `.env`; `--email` / `--users` and explicit Python arguments override settings.
 
 `deposit_structure()` delegates authentication and session configuration to `onedep_lib.config.DepositConfig.load()`. The installed library inspected for these docs uses `~/.config/onedep/config.toml`.
 The details of onedep_lib config can be found here: https://wwpdb.github.io/onedep_lib/usage/#config-file

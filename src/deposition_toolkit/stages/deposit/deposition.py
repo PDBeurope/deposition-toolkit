@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Sequence
 
+from deposition_toolkit.config import get_settings
 from deposition_toolkit.stages.common.manifest import load_manifest
 
 
@@ -41,7 +41,7 @@ class DepositionResult:
 
 def parse_users(value: str | Sequence[str] | None) -> list[str]:
     if value is None:
-        value = os.environ.get("WWPDB_USERS", "")
+        value = get_settings().wwpdb_users
     if isinstance(value, str):
         return [item.strip() for item in value.split(",") if item.strip()]
     return [str(item).strip() for item in value if str(item).strip()]
@@ -134,7 +134,8 @@ def deposit_structure(
         result.reports = {"dry_run": True}
         return result
 
-    email = email or os.environ.get("WWPDB_EMAIL", "")
+    if email is None:
+        email = get_settings().wwpdb_email
     user_ids = parse_users(users)
     if session_id is None:
         if not email:
@@ -254,8 +255,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Deposit one structure directory through OneDep.")
     parser.add_argument("structure_dir", help="Directory containing coordinate and structure factor files.")
     parser.add_argument("--session-id", help="Saved OneDep session UUID to re-upload to.")
-    parser.add_argument("--email", default=os.environ.get("WWPDB_EMAIL", ""), help="Depositor email.")
-    parser.add_argument("--users", default=os.environ.get("WWPDB_USERS", ""), help="Comma-separated WWPDB user IDs.")
+    parser.add_argument("--email", default=get_settings().wwpdb_email, help="Depositor email.")
+    parser.add_argument("--users", default=get_settings().wwpdb_users, help="Comma-separated WWPDB user IDs.")
     parser.add_argument("--country", default="UK", help="onedep_lib Country enum name.")
     parser.add_argument("--experiment-type", default="XRAY", help="onedep_lib ExperimentType enum name.")
     parser.add_argument("--no-poll", action="store_true", help="Return after deposit() without polling status.")

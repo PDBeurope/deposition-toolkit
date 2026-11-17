@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 from collections.abc import Callable
 from pathlib import Path
 
+from deposition_toolkit.config import get_settings
 from deposition_toolkit.stages.common.manifest import (
     load_manifest,
     relative_to_work_dir,
@@ -35,8 +35,8 @@ LOGGER = logging.getLogger("deposition_toolkit")
 def register(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("deposit", help="Upload each active structure through OneDep.")
     parser.add_argument("work_dir")
-    parser.add_argument("--email", default=os.environ.get("WWPDB_EMAIL", ""))
-    parser.add_argument("--users", default=os.environ.get("WWPDB_USERS", ""))
+    parser.add_argument("--email", default=get_settings().wwpdb_email)
+    parser.add_argument("--users", default=get_settings().wwpdb_users)
     parser.add_argument("--country", default="UK")
     parser.add_argument("--experiment-type", default="XRAY")
     parser.add_argument("--no-poll", action="store_true")
