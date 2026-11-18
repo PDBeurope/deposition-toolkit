@@ -7,7 +7,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 from validate_mmcif import validate
 
@@ -121,6 +121,7 @@ def write_group_log(
     input_path: str,
     files: Sequence[Path],
     log_path: Path,
+    on_file: Callable[[Path, int, int], None] | None = None,
 ) -> tuple[int, int, int]:
     failed_files = 0
     total_errors = 0
@@ -137,10 +138,14 @@ def write_group_log(
             log_file.write("No matching files found.\n")
             return 1, 0, 0
 
-        for cif_path in files:
+        for index, cif_path in enumerate(files, 1):
+            if on_file is not None:
+                on_file(cif_path, index, len(files))
+            logger.info("Validating file %d/%d: %s", index, len(files), cif_path)
             log_file.write("=" * 80 + "\n")
             log_file.write(f"file: {cif_path}\n")
 
+            log_file.flush()
             errors, exception = validate_file(dictionary_path, cif_path)
             if exception is not None:
                 failed_files += 1

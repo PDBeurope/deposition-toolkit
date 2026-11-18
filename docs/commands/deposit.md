@@ -43,6 +43,12 @@ For a resumed session, every replacement check must pass before old file registr
 
 For a **new** session, individual file-check results are recorded but are not all explicitly gated before upload; `check_required_files().ok` is the final explicit gate. These paths therefore have different validation guarantees. Remote validation is not a substitute for inspecting earlier toolkit results, which are not prerequisites enforced by this command.
 
+## Progress and logs
+
+The wrapper displays a live progress bar and lists of deposited, failed, pending and current structures. Current activity includes file checks, submission and polling, with elapsed time refreshed even while a call is blocked. `--no-poll` labels successful results as submitted, and `--dry-run` labels them as dry-run passes. These lists describe the current invocation, not earlier runs. Registry failures stop the batch with unattempted structures still pending. Interrupted runs mark the active item as interrupted in the display.
+
+Normal activity, selected input paths, file-check results, polling statuses and final results are logged to both `results/logs/deposition/<structure-relative-path>.log` (the manifest `output`) and the structure's `run.log` (the manifest `log`). Failure diagnostics and recovery details are retained as before. A successful result therefore has useful diagnostics even when no exception occurred. Live progress itself is written to the original terminal stream rather than swallowed by log capture.
+
 ## Polling semantics
 
 After `dep.deposit()` returns, the stage marks status `done`. With polling enabled (default), it requests status up to `64` times at `5` second intervals. A `DepositError` or status string `error` changes status to `failed`; `finished` ends polling successfully. Exhausting the poll budget leaves the current `done` status. `--no-poll` returns after upload without waiting for remote completion.

@@ -78,6 +78,30 @@ class DepositionTests(unittest.TestCase):
             'structure_id': 'manifest-id', 'session_id': 'saved-session',
         })
 
+    def test_successful_upload_logs_normal_activity_and_reports_progress(self):
+        messages = []
+        with self.assertLogs('deposition', level='INFO') as logs:
+            result = self.upload(email='user@example.org', users='user-id', progress=messages.append)
+        self.assertEqual(result.status, 'done')
+        for message in ('Discovering coordinate and structure factor files', 'Creating OneDep session',
+                        'Checking coordinate mmCIF', 'Checking structure factor mmCIF',
+                        'Submitting files to OneDep', 'Submission accepted: D_1234'):
+            self.assertIn(message, messages)
+            self.assertIn(message, '\n'.join(logs.output))
+        self.assertIn('coord_mmcif result=', '\n'.join(logs.output))
+        self.assertIn('Completed deposition', '\n'.join(logs.output))
+
+    def test_polling_logs_status_changes_and_reports_remote_completion(self):
+        self.dep.get_status.side_effect = [SimpleNamespace(status='processing'), SimpleNamespace(status='finished')]
+        messages = []
+        with self.assertLogs('deposition', level='INFO') as logs, patch('deposition_toolkit.stages.deposit.deposition.time.sleep'):
+            result = deposit_structure(self.structure_dir, email='user@example.org', users='user-id',
+                                       progress=messages.append, poll=True)
+        self.assertEqual(result.status, 'done')
+        self.assertIn('OneDep processing: processing', messages)
+        self.assertIn('OneDep processing: finished', messages)
+        self.assertIn('processing details=', '\n'.join(logs.output))
+
     def test_resume_uses_saved_settings_and_replaces_only_matching_types(self):
         self.dep.remote_dep_id = 'D_1234'
         def submit():

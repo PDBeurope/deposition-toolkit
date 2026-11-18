@@ -211,7 +211,7 @@ class LigandProvenanceTests(unittest.TestCase):
         ccd_finalise.register(parser.add_subparsers())
         return parser.parse_args(["ccd-finalise", str(self.work)])
 
-    def finalise(self, codes=("AAA", "BBB"), exit_code=0, names=None):
+    def finalise(self, codes=("AAA", "BBB"), exit_code=0, names=None, allocate_codes=False, status="new_representative"):
         stage2 = self.work / "results/ccd/stage_2/sample"
         stage2.mkdir(parents=True, exist_ok=True)
         final = self.work / "results/ccd/final"
@@ -221,9 +221,11 @@ class LigandProvenanceTests(unittest.TestCase):
             writer.writeheader()
             # Reverse report order to verify matching by filename, never position.
             for name, code in reversed(list(zip(names or [r["ligand_name"] for r in self.records], codes))):
-                writer.writerow(dict(structure="sample", ligand_name=name, CCD=code, status="new_representative"))
+                writer.writerow(dict(structure="sample", ligand_name=name, CCD=code, status=status))
         with patch.object(finalize_ccds, "main", return_value=exit_code):
-            return ccd_finalise.run(self.finalise_args())
+            args = self.finalise_args()
+            args.allocate_codes = allocate_codes
+            return ccd_finalise.run(args)
 
     def test_finalisation_binds_by_filename_and_command_needs_no_csv(self):
         self.assertEqual(self.finalise(), 0)
@@ -232,9 +234,34 @@ class LigandProvenanceTests(unittest.TestCase):
         (self.work / "results/ccd/final/ccd_processing_details.csv").unlink()
         self.assertEqual(lig_rename.run(argparse.Namespace(work_dir=str(self.work), summary_csv=None)), 0)
 
+    def test_preview_reports_pending_allocation_without_failure_or_placeholder_mapping(self):
+        import io
+        from contextlib import redirect_stdout
+
+        self.allocate(("OLD", "OLD"))
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(self.finalise(("AAA", "PENDING_ALLOCATION")), 0)
+        manifest = load_manifest(self.structure)
+        step = manifest["steps"]["ccd_finalise"]
+        self.assertEqual(step["status"], "pending allocation")
+        self.assertEqual(step["pending_allocation_count"], 1)
+        self.assertEqual(step["ccd_keys"], ["AAA"])
+        self.assertNotIn("error", step)
+        self.assertEqual([row.get("CCD") for row in manifest["ccd_ligands"]], ["AAA", None])
+        self.assertIn("0 failed", output.getvalue())
+        self.assertIn("1 pending allocation", output.getvalue())
+
+    def test_unallocated_codes_still_fail_when_allocation_was_requested(self):
+        self.assertEqual(self.finalise(("PENDING_ALLOCATION", "PENDING_ALLOCATION"), allocate_codes=True), 1)
+        self.assertEqual(load_manifest(self.structure)["steps"]["ccd_finalise"]["status"], "failed")
+
+    def test_missing_inchikey_still_fails_during_preview(self):
+        self.assertEqual(self.finalise(("PENDING_ALLOCATION", "PENDING_ALLOCATION"), status="missing_inchikey"), 1)
+        self.assertEqual(load_manifest(self.structure)["steps"]["ccd_finalise"]["status"], "failed")
+
     def test_failed_preview_or_unmatched_finalisation_clears_previous_codes(self):
-        for codes, exit_code, names in ((["AAA", "PENDING_ALLOCATION"], 0, None),
-                                        (["AAA", "BBB"], 1, None),
+        for codes, exit_code, names in ((["AAA", "BBB"], 1, None),
                                         (["AAA", "BBB"], 0, ["unknown.cif", "LIG__002.cif"])):
             with self.subTest(codes=codes, exit_code=exit_code, names=names):
                 self.allocate(("OLD", "OLD"))

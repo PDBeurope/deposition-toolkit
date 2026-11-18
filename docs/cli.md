@@ -41,6 +41,8 @@ Finalisation runs across the dataset: per-structure logs contain the mapped liga
 
 Use global `--verbose` before the command to keep detailed diagnostics visible while also saving them in logs. Stage-specific verbosity flags control how much detail their stages generate.
 
+`deposit` and `mmcif-validation` also show live progress. Deposition lists deposited (or submitted with `--no-poll`), failed, pending and current structures, with the current operation and elapsed time. Validation shows a structure progress bar, pass/fail counts and the current file. The terminal refreshes every second, including during a blocking operation. Long live lists are abbreviated to fit the screen; final lists are complete. Redirected output and `--verbose` use ordinary progress events with a heartbeat after 30 seconds without an update, rather than cursor-control animations. Progress remains visible while detailed diagnostics are captured in logs.
+
 ## CCD finalisation options
 
 | Option | Default / purpose |
@@ -64,6 +66,6 @@ Use global `--verbose` before the command to keep detailed diagnostics visible w
 
 Most wrappers return `0` on batch success and `1` if a processed structure fails or no active structures are found. `mmcif-validation` returns `2` for a missing dictionary. Unhandled exceptions and argparse errors also produce nonzero termination; exact values are not uniform across standalone scripts.
 
-`submission-report` returns `0` after producing a report even when manifest results fail. Preparation can succeed with zero discovered structures. Finalisation's standalone preview can return `0` with pending codes, while the wrapper returns `1` for unresolved per-ligand mappings. Inspect manifests and outputs as well as the exit code.
+`submission-report` returns `0` after producing a report even when manifest results fail. Preparation can succeed with zero discovered structures. Finalisation previews without `--allocate-codes` report `pending allocation` and return `0` when allocation is the only remaining work. Missing descriptors, provenance errors, finaliser errors, or unresolved codes when allocation was requested still return `1`. Inspect manifests and outputs as well as the exit code.
 
 Commands rerun selected structures regardless of earlier `done`/`failed` status. There is no `run-all`, automatic resume scheduler, or dependency gate. See [recovery](recovery.md) before repeating allocating or uploading operations.

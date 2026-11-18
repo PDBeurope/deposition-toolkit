@@ -191,11 +191,12 @@ def print_run_summary(work_dir: Path, step_name: str, structures: list[Path]) ->
     counts = Counter(step.get("status", "not run") for step in steps)
     excluded = 0 if step_name == STEP_PREPARE else sum(is_excluded(path) for path in discover_structure_dirs(work_dir))
     command = "enrich-metadata" if step_name == STEP_METADATA_ENRICHMENT else step_name.replace("_", "-")
+    pending = f", {counts['pending allocation']} pending allocation" if step_name == STEP_CCD_FINALISE else ""
     print(f"{command}: {len(structures)} structures; "
           f"{counts['done']} succeeded, {counts['failed']} failed, "
-          f"{counts['not applicable']} not applicable, {excluded} excluded.")
+          f"{counts['not applicable']} not applicable, {excluded} excluded{pending}.")
     other = {status: count for status, count in counts.items()
-             if status not in {"done", "failed", "not applicable"}}
+             if status not in {"done", "failed", "not applicable", "pending allocation"}}
     if other:
         print("Other outcomes: " + ", ".join(f"{count} {status}" for status, count in sorted(other.items())))
     if step_name == STEP_CCD_CREATION:
@@ -242,6 +243,7 @@ def print_run_summary(work_dir: Path, step_name: str, structures: list[Path]) ->
     elif step_name == STEP_CCD_FINALISE:
         rows = [row for step in steps for row in step.get("ligands", [])]
         print(f"Finalisation rows: {len(rows)}; unique CCD IDs: "
-              f"{len({key for step in steps for key in step.get('ccd_keys', [])})}.")
+              f"{len({key for step in steps for key in step.get('ccd_keys', [])})}; "
+              f"{sum(step.get('pending_allocation_count', 0) for step in steps)} ligand rows pending allocation.")
     print(f"Detailed logs: {work_dir / 'results' / 'logs' / step_name} (linked in manifests).")
     return bool(counts['failed'])

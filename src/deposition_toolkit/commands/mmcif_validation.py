@@ -4,7 +4,9 @@ import argparse
 from pathlib import Path
 
 from deposition_toolkit.config import get_settings
-from deposition_toolkit.stages.common.manifest import relative_to_work_dir, update_step
+from deposition_toolkit.stages.common.manifest import load_manifest, relative_to_work_dir, update_step
+
+from .progress import BatchProgress
 
 from .shared import print_run_summary, structure_log, STEP_MMCIF_VALIDATION, LOGGER, require_structures, results_path
 
@@ -36,28 +38,33 @@ def run(args: argparse.Namespace) -> int:
 
     log_dir = results_path(work_dir, "logs", "mmcif_validation")
     any_failed = False
-    for structure_dir in structure_dirs:
-        with structure_log(work_dir, structure_dir, STEP_MMCIF_VALIDATION):
-            files = mmcif_validate.expand_input(str(structure_dir), recursive=False)
-            log_path = log_dir / f"{structure_dir.name}_validation.log"
-            failed_files, error_count, warning_count = mmcif_validate.write_group_log(
-                dictionary_path=dictionary_path,
-                input_path=str(structure_dir),
-                files=files,
-                log_path=log_path,
-            )
-            any_failed = any_failed or bool(failed_files)
-            update_step(
-                structure_dir,
-                STEP_MMCIF_VALIDATION,
-                "failed" if failed_files else "done",
-                output=relative_to_work_dir(log_path, work_dir),
-                extra={
-                    "files": len(files),
-                    "failed_files": failed_files,
-                    "errors": error_count,
-                    "warnings": warning_count,
-                },
-            )
+    names = [str(path.relative_to(work_dir)) for path in structure_dirs]
+    with BatchProgress(names, label="mmCIF validation") as progress:
+        for structure_dir in structure_dirs:
+            name = str(structure_dir.relative_to(work_dir))
+            with progress.track(name, lambda: load_manifest(structure_dir)["steps"][STEP_MMCIF_VALIDATION]["status"]):
+                with structure_log(work_dir, structure_dir, STEP_MMCIF_VALIDATION):
+                    files = mmcif_validate.expand_input(str(structure_dir), recursive=False)
+                    log_path = log_dir / f"{structure_dir.name}_validation.log"
+                    failed_files, error_count, warning_count = mmcif_validate.write_group_log(
+                        dictionary_path=dictionary_path,
+                        input_path=str(structure_dir),
+                        files=files,
+                        log_path=log_path,
+                        on_file=lambda path, index, total: progress.stage(f"Validating file {index}/{total}: {path.name}"),
+                    )
+                    any_failed = any_failed or bool(failed_files)
+                    update_step(
+                        structure_dir,
+                        STEP_MMCIF_VALIDATION,
+                        "failed" if failed_files else "done",
+                        output=relative_to_work_dir(log_path, work_dir),
+                        extra={
+                            "files": len(files),
+                            "failed_files": failed_files,
+                            "errors": error_count,
+                            "warnings": warning_count,
+                        },
+                    )
     failed = print_run_summary(work_dir, STEP_MMCIF_VALIDATION, structure_dirs)
     return 1 if any_failed or failed else 0

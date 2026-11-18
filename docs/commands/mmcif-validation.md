@@ -23,6 +23,8 @@ flowchart TD
 
 The stage captures validator exceptions per file. Severity `error` increments error counts and fails the file; severity `warning` increments warning counts without failing it. An empty matched file list counts as one failed-file outcome. The wrapper returns one if any files fail, otherwise zero.
 
+The wrapper displays a live structure progress bar with success/failure/pending counts, the current structure and file index/name, and elapsed time. It refreshes during blocking validation calls; redirected output uses progress events and periodic heartbeats.
+
 **Output:** `results/logs/mmcif_validation/<structure>_validation.log`, containing input paths, dictionary, per-file diagnostics and aggregate counts. Manifest step fields include `files`, `failed_files`, `errors`, `warnings` and log path. Source CIFs are not modified.
 
 **Edges:** directory expansion always uses recursive `rglob('*.cif')` despite the wrapper passing `recursive=False`; this includes restraint and generated `.cif` files below the structure. `.mmcif` and compressed inputs are not selected by that directory rule. No-match and missing-dictionary outcomes differ. Standalone mode accepts file/directory/glob inputs with its own parser; consult its `--help`.

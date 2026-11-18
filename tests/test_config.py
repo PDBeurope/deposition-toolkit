@@ -112,7 +112,7 @@ class SettingsTests(unittest.TestCase):
         template = Path(__file__).resolve().parents[1] / ".env.example"
         with configured_directory(""):
             settings = Settings(_env_file=template)
-            self.assertEqual(settings.postgres_host, "pgsql-hlvm-172")
+            self.assertEqual(settings.postgres_host, "pgsql-hlvm-xxx")
             self.assertEqual(settings.ccd_db_password.get_secret_value(), "place-holder")
 
 

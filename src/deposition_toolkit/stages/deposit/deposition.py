@@ -6,7 +6,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 from deposition_toolkit.config import get_settings
 from deposition_toolkit.stages.common.manifest import load_manifest
@@ -104,13 +104,20 @@ def deposit_structure(
     poll_interval: int = 5,
     max_polls: int = 64,
     dry_run: bool = False,
+    progress: Callable[[str], None] | None = None,
 ) -> DepositionResult:
     """Upload a structure, or replace files in an existing saved OneDep session.
 
     Resuming requires the local OneDep session files in the configured session_dir.
     The saved depositor and experiment settings are retained on re-upload.
     """
+    def report_progress(message: str) -> None:
+        LOGGER.info("%s: %s", structure_dir.name, message)
+        if progress is not None:
+            progress(message)
+
     structure_dir = Path(structure_dir).resolve()
+    report_progress("Discovering coordinate and structure factor files")
     manifest = load_manifest(structure_dir)
     result = DepositionResult(
         structure_id=manifest["structure_id"],
@@ -128,10 +135,13 @@ def deposit_structure(
         return result
     result.coord_file = str(coord_file)
     result.sf_file = str(sf_file)
+    LOGGER.info("Input files for %s: coordinates=%s structure_factors=%s",
+                result.structure_id, coord_file, sf_file)
 
     if dry_run:
         result.status = "done"
         result.reports = {"dry_run": True}
+        report_progress("Dry run completed; input files found, no upload performed")
         return result
 
     if email is None:
@@ -155,11 +165,14 @@ def deposit_structure(
 
     dep = None
     try:
+        report_progress("Loading OneDep configuration")
         config = DepositConfig.load()
         old_files = []
         if session_id is not None:
+            report_progress("Resuming saved OneDep session")
             dep = dsp.deposit_resume(session_id, config=config)
         else:
+            report_progress("Creating OneDep session")
             dep = dsp.deposit_init(
                 email=email,
                 users=user_ids,
@@ -180,6 +193,7 @@ def deposit_structure(
             else:
                 dep.set_experiment_type(getattr(dsp.ExperimentType, experiment_type.upper()))
 
+            report_progress("Checking OneDep authentication")
             auth_ok = bool(check_auth_key(config=config))
             result.reports["auth_key_ok"] = auth_ok
             if not auth_ok:
@@ -189,18 +203,24 @@ def deposit_structure(
             # Keep the old registrations until every replacement has passed checks.
             new_ids = []
             try:
+                report_progress("Registering coordinate file")
                 coord_id = dep.add_file(str(coord_file), dsp.FileType.MMCIF_COORD)
                 new_ids.append(coord_id)
+                report_progress("Registering structure factor file")
                 sf_id = dep.add_file(str(sf_file), dsp.FileType.CRYSTAL_STRUC_FACTORS)
                 new_ids.append(sf_id)
                 result.file_ids = {"coord": coord_id, "sf": sf_id}
-                result.reports.update({
-                    "coord_mmcif": report_to_dict(dep.check_mmcif_file(coord_id)),
-                    "coord_atom_site": report_to_dict(dep.check_mmcif_category(coord_id, "_atom_site")),
-                    "coord_file_type": report_to_dict(dep.check_file_type(coord_id, dsp.FileType.MMCIF_COORD)),
-                    "sf_mmcif": report_to_dict(dep.check_mmcif_file(sf_id)),
-                    "sf_file_type": report_to_dict(dep.check_file_type(sf_id, dsp.FileType.CRYSTAL_STRUC_FACTORS)),
-                })
+                checks = (
+                    ("coord_mmcif", "Checking coordinate mmCIF", dep.check_mmcif_file, (coord_id,)),
+                    ("coord_atom_site", "Checking coordinate atom sites", dep.check_mmcif_category, (coord_id, "_atom_site")),
+                    ("coord_file_type", "Checking coordinate file type", dep.check_file_type, (coord_id, dsp.FileType.MMCIF_COORD)),
+                    ("sf_mmcif", "Checking structure factor mmCIF", dep.check_mmcif_file, (sf_id,)),
+                    ("sf_file_type", "Checking structure factor file type", dep.check_file_type, (sf_id, dsp.FileType.CRYSTAL_STRUC_FACTORS)),
+                )
+                for name, message, check, arguments in checks:
+                    report_progress(message)
+                    result.reports[name] = report_to_dict(check(*arguments))
+                    LOGGER.info("%s: %s result=%s", result.structure_id, name, result.reports[name])
                 if session_id is not None and not all(
                     report["ok"] for name, report in result.reports.items() if name != "auth_key_ok"
                 ):
@@ -219,20 +239,27 @@ def deposit_structure(
                 if old_file.file_type in replaced_types:
                     dep.remove_file(old_file.file_id)
 
+            report_progress("Checking required deposition files")
             required_report = dep.check_required_files()
             result.reports["required_files"] = report_to_dict(required_report)
             if not required_report.ok:
                 result.error = "Required files check failed."
                 return result
 
+            report_progress("Submitting files to OneDep")
             dep_id = dep.deposit()
             result.deposition_id = str(dep_id or dep.remote_dep_id or "")
             result.status = "done"
+            report_progress(f"Submission accepted: {result.deposition_id}")
             if poll:
+                report_progress("Waiting for OneDep processing")
                 for _ in range(max_polls):
+                    LOGGER.info("%s: polling OneDep status", result.structure_id)
                     current = dep.get_status()
                     result.final_status = status_to_dict(current)
                     current_status = str(result.final_status.get("status", "")).lower()
+                    report_progress(f"OneDep processing: {current_status or 'unknown'}")
+                    LOGGER.info("%s: processing details=%s", result.structure_id, result.final_status)
                     if isinstance(current, dsp.DepositError) or current_status == "error":
                         result.status = "failed"
                         result.error = result.final_status.get("details", "Deposition processing failed.")
@@ -240,6 +267,8 @@ def deposit_structure(
                     if current_status == "finished":
                         break
                     time.sleep(poll_interval)
+        LOGGER.info("Completed deposition for %s: status=%s deposition_id=%s error=%s",
+                    result.structure_id, result.status, result.deposition_id, result.error or "none")
         return result
     except Exception as exc:
         LOGGER.exception("Deposition failed for %s", result.structure_id)

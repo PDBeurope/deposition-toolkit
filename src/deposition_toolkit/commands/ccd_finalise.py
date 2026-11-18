@@ -175,15 +175,27 @@ def run(args: argparse.Namespace) -> int:
                 for ligand in ligands:
                     ligand.pop("CCD", None)
             set_top_level_fields(structure_dir, ccd_ligands=ligands)
+            pending_rows = [
+                row for row in rows
+                if row.get("CCD") == finalize_ccds.PENDING_CCD
+                and row.get("status") in {"new_representative", "duplicate_in_batch"}
+                and not args.allocate_codes
+            ]
             problem_rows = [
                 row
                 for row in rows
-                if not row.get("CCD")
-                or not finalize_ccds.is_real_ccd_id(row.get("CCD", ""))
-                or row.get("status") == "missing_inchikey"
+                if row not in pending_rows and (
+                    not finalize_ccds.is_real_ccd_id(row.get("CCD", ""))
+                    or row.get("status") == "missing_inchikey"
+                )
             ]
-            ccds = sorted({row.get("CCD", "") for row in rows if row.get("CCD", "")})
-            status = "failed" if problem_rows or mapping_errors or exit_code else "done"
+            ccds = sorted({row["CCD"] for row in rows if finalize_ccds.is_real_ccd_id(row.get("CCD", ""))})
+            if problem_rows or mapping_errors or exit_code:
+                status = "failed"
+            elif pending_rows:
+                status = "pending allocation"
+            else:
+                status = "done"
             any_failed = any_failed or status == "failed"
             update_step(
                 structure_dir,
@@ -192,6 +204,7 @@ def run(args: argparse.Namespace) -> int:
                 outputs=relative_outputs([path for path in common_outputs if path.exists()], work_dir),
                 error="; ".join(([f"{len(problem_rows)} ligand row(s) need attention."] if problem_rows else []) + mapping_errors) or None,
                 extra={
+                    "pending_allocation_count": len(pending_rows),
                     "ccd_keys": ccds,
                     "ligands": rows,
                 },
