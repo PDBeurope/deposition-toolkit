@@ -14,7 +14,9 @@ The stage handles remote/session behavior; the wrapper owns registry lookup, man
 
 ```mermaid
 flowchart TD
-    A[Active structure and manifest] --> B{Dry-run?}
+    A[Active structure and manifest] --> S{Deposition done, excluding dry-run results?}
+    S -->|Yes| T[Skip; leave manifest and logs unchanged]
+    S -->|No| B{Dry-run?}
     B -->|Yes| C[Discover coordinate and SF only; return]
     B -->|No| D[Registry lookup by dataset and structure_id]
     D -->|Lookup error or entry without session| X[Stop batch before this upload]
@@ -61,9 +63,11 @@ Consequently, toolkit `done` means the upload path returned without a detected f
 
 The wrapper stores the result under `steps.deposition`. If a remote ID is known, it also saves top-level `deposition_id`/`session_id` and `deposition_record`. When both IDs exist it upserts the registry even if processing failed, allowing retries to find the same remote deposition. A save error stops the batch after manifest recovery details are written. Lookup errors also stop the batch; earlier structures may already have uploaded.
 
+Rerunning `deposit` skips active structures whose `steps.deposition.status` is `done`, except results marked with `reports.dry_run`. Before processing, it prints the number skipped and the number remaining to deposit (or check with `--dry-run`). Skipped structures receive no registry lookup or upload, and their manifests and logs are retained. If all active structures are already deposited, the command succeeds without uploading anything. Failed, unfinished and previously unrun structures remain eligible; the progress display and final summary cover only entries attempted in the current invocation.
+
 **Dry-run:** bypasses PostgreSQL and OneDep imports/config/authentication/session creation; it requires matching coordinate/SF files and writes a result/log/manifest. It does not validate file content.
 
-**Edges:** missing local session files cannot be repaired from a remote ID alone. The wrapper uses the registry rather than top-level manifest IDs for session lookup. A created session with no remote ID is not persisted to the registry by this wrapper; inspect local session storage on such failures. Remote upload and registry upsert are not one atomic operation. Repeated commands intentionally replace remote files, not simply skip `done` structures.
+**Edges:** missing local session files cannot be repaired from a remote ID alone. The wrapper uses the registry rather than top-level manifest IDs for session lookup. A created session with no remote ID is not persisted to the registry by this wrapper; inspect local session storage on such failures. Remote upload and registry upsert are not one atomic operation. Retried entries with saved sessions replace remote files; completed entries are skipped.
 
 ## Python and standalone entry points
 

@@ -37,6 +37,8 @@ Stage output trees are not cleaned automatically. Stale stage-1 files may be ann
 
 ## Deposition retry
 
+Rerun `deposit` on the same work directory to retry failed or unfinished entries. Entries with `steps.deposition.status` set to `done` are skipped, except successful dry runs, which remain eligible for upload. The command prints how many entries it skips and how many remain before processing.
+
 ```mermaid
 flowchart TD
     A[Upload or processing failed] --> B{Known remote and session IDs?}

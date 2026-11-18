@@ -59,6 +59,18 @@ def run(
     if not structure_dirs:
         return 1
 
+    pending = []
+    for structure_dir in structure_dirs:
+        step = load_manifest(structure_dir)["steps"].get(STEP_DEPOSITION, {})
+        if step.get("status") != "done" or step.get("reports", {}).get("dry_run"):
+            pending.append(structure_dir)
+    skipped = len(structure_dirs) - len(pending)
+    print(f"Skipping {skipped} entries as they are marked as deposited; "
+          f"{len(pending)} entries to {'check (dry run)' if args.dry_run else 'deposit'}.")
+    structure_dirs = pending
+    if not structure_dirs:
+        return 0
+
     if not args.dry_run:
         from sqlalchemy.exc import SQLAlchemyError
 

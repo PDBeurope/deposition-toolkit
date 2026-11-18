@@ -1,8 +1,10 @@
 """Exercise registry transactions and command orchestration without remote services."""
 
 import argparse
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
 import importlib
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -121,9 +123,11 @@ class DepositCommandRegistryTests(RegistryFixture):
                'deposition_id': 'D_1234', 'status': 'done', **overrides}
         )
 
-    def test_default_command_creates_then_resumes_registry_session(self):
-        with patch.object(deposit, 'deposit_structure', side_effect=[self.result(), self.result()]) as stage:
-            self.assertEqual(deposit.run(self.args), 0)
+    def test_default_command_retries_failed_deposition_with_registry_session(self):
+        with patch.object(deposit, 'deposit_structure', side_effect=[
+            self.result(status='failed', error='upload interrupted'), self.result(),
+        ]) as stage:
+            self.assertEqual(deposit.run(self.args), 1)
             self.assertEqual(deposit.run(self.args), 0)
         self.assertEqual([call.kwargs['session_id'] for call in stage.call_args_list], [None, 'session-1'])
         self.assertEqual(find_session_id('dataset', 'model'), 'session-1')
@@ -132,6 +136,66 @@ class DepositCommandRegistryTests(RegistryFixture):
         self.assertEqual(manifest['steps']['deposition']['deposition_record'], self.record)
         with Session(self.engine) as session:
             self.assertEqual(len(session.scalars(select(DepositionRegistry)).all()), 1)
+
+    def test_completed_rerun_skips_registry_upload_and_preserves_manifest_and_logs(self):
+        with patch.object(deposit, 'deposit_structure', return_value=self.result()):
+            self.assertEqual(deposit.run(self.args), 0)
+        manifest_before = (self.structure_dir / 'manifest.json').read_bytes()
+        logs_before = {path: path.read_bytes() for path in self.work_dir.rglob('*.log')}
+        output = io.StringIO()
+        with patch('deposition_toolkit.ledger.depositions.find_session_id') as lookup, \
+             patch('deposition_toolkit.ledger.depositions.save_deposition') as save, \
+             patch.object(deposit, 'deposit_structure') as stage, \
+             patch.object(deposit, 'BatchProgress') as progress, redirect_stdout(output):
+            self.assertEqual(deposit.run(self.args), 0)
+        lookup.assert_not_called()
+        save.assert_not_called()
+        stage.assert_not_called()
+        progress.assert_not_called()
+        self.assertIn('Skipping 1 entries as they are marked as deposited; 0 entries to deposit.', output.getvalue())
+        self.assertEqual((self.structure_dir / 'manifest.json').read_bytes(), manifest_before)
+        self.assertEqual({path: path.read_bytes() for path in self.work_dir.rglob('*.log')}, logs_before)
+
+    def test_mixed_batch_only_deposits_entries_without_completed_deposition(self):
+        manifest = load_manifest(self.structure_dir)
+        manifest['steps']['deposition'] = {'status': 'done'}
+        write_manifest(self.structure_dir, manifest)
+        manifest_before = (self.structure_dir / 'manifest.json').read_bytes()
+        retry_dirs = []
+        for status in ('failed', 'running', None):
+            directory = self.work_dir / str(status)
+            directory.mkdir()
+            payload = {'structure_id': str(status), 'source_tarball': '/incoming/dataset.tgz', 'steps': {}}
+            if status is not None:
+                payload['steps']['deposition'] = {'status': status}
+            write_manifest(directory, payload)
+            retry_dirs.append(directory)
+        # Structures discovered from files alone must also remain eligible.
+        unrun = self.work_dir / 'unrun'
+        unrun.mkdir()
+        (unrun / 'unrun_struc.cif').touch()
+        retry_dirs.append(unrun)
+        output = io.StringIO()
+        with patch.object(deposit, 'deposit_structure', return_value=self.result()) as stage, \
+             patch('deposition_toolkit.ledger.depositions.save_deposition'), redirect_stdout(output):
+            self.assertEqual(deposit.run(self.args, session_lookup=lambda *_: None), 0)
+        self.assertCountEqual([call.args[0] for call in stage.call_args_list], [path.resolve() for path in retry_dirs])
+        self.assertIn('Skipping 1 entries as they are marked as deposited; 4 entries to deposit.', output.getvalue())
+        self.assertIn('deposition: 4 structures; 4 succeeded', output.getvalue())
+        self.assertEqual((self.structure_dir / 'manifest.json').read_bytes(), manifest_before)
+
+    def test_successful_dry_run_remains_eligible_for_real_deposition(self):
+        self.args.dry_run = True
+        with patch.object(deposit, 'deposit_structure', return_value=self.result(
+            deposition_id='', session_id='', reports={'dry_run': True},
+        )):
+            self.assertEqual(deposit.run(self.args), 0)
+        self.args.dry_run = False
+        output = io.StringIO()
+        with patch.object(deposit, 'deposit_structure', return_value=self.result()) as stage, redirect_stdout(output):
+            self.assertEqual(deposit.run(self.args), 0)
+        stage.assert_called_once()
+        self.assertIn('Skipping 0 entries as they are marked as deposited; 1 entries to deposit.', output.getvalue())
 
     def test_lookup_failure_prevents_upload(self):
         with patch('deposition_toolkit.ledger.depositions.find_session_id',
