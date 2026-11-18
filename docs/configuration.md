@@ -53,14 +53,14 @@ Defaults come from `src/deposition_toolkit/config.py`; `.env.example` is the edi
 | `CCD_CVS_PATH` | `/nfs/public/services/onedep_gpfs/data/production/reference/components/ligand-dict-v3` |
 | `TOOLS_ROOT` | `/nfs/public/services/onedep_gpfs/resources/tools/tools-centos-7.9` |
 | `ANNOTATE_BIN` | Unset; derives `<TOOLS_ROOT>/packages/cc-tools-v2/bin/annotateComp` |
-| `CCD_DB_HOST` | `mysql-pdbe-onedep-prod` |
-| `CCD_DB_PORT` | `4437` |
-| `CCD_DB_USER` | `pdberead` |
+| `CCD_DB_HOST` | `onedep-mysql-db` |
+| `CCD_DB_PORT` | `1111` |
+| `CCD_DB_USER` | `read-user` |
 | `CCD_DB_PASSWORD` | Empty in code; example file has `place-holder`; supply the real credential for MySQL |
 | `CCD_DB_TIMEOUT` | `30` seconds; positive integer |
-| `POSTGRES_HOST` | `pgsql-hlvm-172` |
+| `POSTGRES_HOST` | `pgsql-vm-xxx` |
 | `POSTGRES_PORT` | `5432` |
-| `POSTGRES_USER` | `pdb_dep` |
+| `POSTGRES_USER` | `pdb-user` |
 | `POSTGRES_PASSWORD` | `place-holder`; replace for real ledger access |
 | `POSTGRES_DATABASE` | Unset/blank uses `POSTGRES_USER` |
 | `WWPDB_EMAIL` | Empty; depositor email for new depositions |

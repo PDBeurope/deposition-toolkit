@@ -23,10 +23,10 @@ COMMAND_MODULES = (
     mmcif_validation,
     analyse_chains,
     enrich_metadata,
+    resolution_cleanup,
     ccd_creation,
     ccd_annotate,
     ccd_finalise,
     lig_rename,
-    resolution_cleanup,
     deposit,
 )
