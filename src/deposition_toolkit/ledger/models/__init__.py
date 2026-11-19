@@ -15,3 +15,4 @@ class Base(DeclarativeBase):
 
 
 from .deposition import DepositionRegistry  # noqa: E402,F401
+from .structure import Structure  # noqa: E402,F401

@@ -113,8 +113,11 @@ class LedgerTests(unittest.TestCase):
         self.assertIn("CREATE TABLE deposition_registry", sql)
         self.assertIn("UNIQUE (dataset, structure_id)", sql)
         self.assertIn("TIMESTAMP WITH TIME ZONE", sql)
-        self.assertEqual(sql.count("CREATE TABLE"), 2)
-        self.assertEqual(set(Base.metadata.tables), {"deposition_registry"})
+        self.assertIn("CREATE TABLE structures", sql)
+        self.assertIn("structure_details JSONB NOT NULL", sql)
+        self.assertIn("UNIQUE (group_id, structure_id)", sql)
+        self.assertEqual(sql.count("CREATE TABLE"), 3)
+        self.assertEqual(set(Base.metadata.tables), {"deposition_registry", "structures"})
 
     def test_cli_help_does_not_import_database_dependencies(self):
         # A fresh interpreter catches eager imports, even when tests imported ledger.

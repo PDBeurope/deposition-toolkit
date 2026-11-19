@@ -19,6 +19,14 @@ Initialize the ledger schema in your configured PostgreSQL database before the f
 uv run deposition-toolkit ledger upgrade
 ```
 
+Store complete structure manifests in PostgreSQL as JSONB:
+
+```bash
+uv run deposition-toolkit ledger load-manifest work/path_to_structures/
+```
+
+Previously loaded groups require confirmation after showing existing and new structure counts. See [manifest storage](docs/commands/ledger.md#load-structure-manifests) for input requirements and replacement behavior.
+
 ## Example workflow
 
 Run these commands in order, reviewing each stage's results before continuing. Replace the input paths and group ID with yours. Preparation prints the work directory, captured below as `WORK_DIR`.

@@ -1,5 +1,7 @@
 """Validated inputs and outputs for ledger operations."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -15,3 +17,8 @@ class DepositionIdentity(LedgerSchema):
 class DepositionRegistration(DepositionIdentity):
     dep_id: str = Field(min_length=1)
     session_id: str = Field(min_length=1)
+
+
+class StructureManifest(DepositionIdentity):
+    group_id: str = Field(min_length=1)
+    structure_details: dict[str, Any]
