@@ -37,6 +37,7 @@ Here is a summary of which settings are used by which parameter.
 | `ccd-finalise` CVS mode | `CCD_CVS_PATH` | Checkout destination; `--cvs-path` overrides the commit helper only, not allocation checks |
 | `resolution-cleanup` | No environment setting | Optional YAML via `--config`; otherwise `BatchConfig` defaults |
 | `ledger`, real `deposit` | `POSTGRES_HOST/PORT/USER/PASSWORD`, optional `POSTGRES_DATABASE` | Toolkit registry; `deposit --dry-run` bypasses it |
+| `validation-report` | `DEPOSITION_ROOT` | Local OneDep production deposit directory; no database or authentication required |
 | New real deposition | `WWPDB_EMAIL`, `WWPDB_USERS` or CLI equivalents; OneDep authentication | Depositor identity and remote authentication |
 | Standalone validation dashboard | `DEPOSITION_ROOT` | Existing OneDep output tree; `--base-path` overrides it |
 

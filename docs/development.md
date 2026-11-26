@@ -34,13 +34,13 @@ From the checkout with its dependencies installed, prefix the module invocations
 | `deposition_toolkit.stages.ccd_creation.ligand_renaming.lig_renaming` | `/input/ccd_processing_details.csv /input/structure-parent`; still requires instance manifests |
 | `deposition_toolkit.stages.resolution_cleanup.resolution_cleanup` | `--input /input/sample_struc.cif --dry-run`; separate standalone overwrite confirmation and batch mode |
 | `deposition_toolkit.stages.deposit.deposition` | `/input/structure --dry-run`; real resume accepts `--session-id UUID` |
-| `deposition_toolkit.stages.validation_report.val_report` | `D_123456 --base-path /onedep/deposit --output /output/dashboard.html` |
+| `deposition_toolkit.stages.validation_report.val_report` | `/processing/sample`; delegates to the registered `validation-report` command |
 
 A direct call to `deposit_structure()` or its standalone script does **not** perform toolkit ledger lookup/upsert or write wrapper step status. The caller owns persistence/recovery. Similarly, standalone stage successes may have different exit semantics. `scripts/` contains historical recipes with assumptions about working directories, imports and deployment paths; use the package modules for current behavior.
 
 ## Post-deposition validation dashboard
 
-`stages/validation_report/val_report.py` has no registered toolkit command. It validates `D_<digits>` IDs, reads each deposition directory under `DEPOSITION_ROOT` or `--base-path`, chooses the highest numeric `.V*` version of validation XML and model CIF, and extracts metrics, residue issues, entry title and PDB ID. It writes self-contained HTML plus a metadata text/CSV file. Optional `--collect-val-pdf` packages latest validation PDFs into a ZIP. Missing/unreadable inputs appear as problem reports and cause exit `2`; normal completion is `0`. This consumes existing OneDep files; it does not fetch remote results or update manifests/registry.
+Use `deposition-toolkit validation-report /processing/sample` after OneDep generates its reports. The stage exposes XML parsing, HTML rendering, metadata writing and PDF collection functions; the wrapper selects deposited structures, groups outputs by dataset and records manifest results. The module entry point delegates to the same command. See [validation-report](commands/validation-report.md) for outputs and retry behavior.
 
 ## Database changes
 

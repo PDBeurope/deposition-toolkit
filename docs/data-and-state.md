@@ -21,6 +21,7 @@ The archive determines the extracted nesting; `pdb_depo_files/` is an example, n
 │       └── manifest.json
 └── results/
     ├── submission_report/            # structures.log, <group>_summary.pdf
+    ├── validation_report/            # <dataset>_validation_dashboard.html, metadata CSV, PDF ZIP
     ├── ccd/
     │   ├── stage_1/<structure>/      # <component>__001.cif and .png
     │   ├── stage_2/<structure>/      # annotated files, same filenames
@@ -102,7 +103,7 @@ Illustrative fields from a prepared structure and a completed ligand mapping:
 | `deposition_id`, `session_id` | Deposition wrapper saves known recovery IDs |
 | `steps.<step>` | Latest wrapper result, UTC timestamp, outputs/errors, and command-specific details |
 
-Actual step keys are `prepare_dataset`, `submission_report`, `mmcif_validation`, `analyse_chains`, `metadata_enrichment`, `ccd_creation`, `ccd_annotate`, `ccd_finalise`, `lig_rename`, `resolution_cleanup`, and `deposition`.
+Actual step keys are `prepare_dataset`, `submission_report`, `mmcif_validation`, `analyse_chains`, `metadata_enrichment`, `ccd_creation`, `ccd_annotate`, `ccd_finalise`, `lig_rename`, `resolution_cleanup`, `deposition`, and `validation_report`.
 
 ### Update semantics
 

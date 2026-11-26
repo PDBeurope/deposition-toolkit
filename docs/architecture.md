@@ -113,7 +113,7 @@ Paths below are relative to `src/deposition_toolkit/`.
 | `stages/ccd_creation/ligand_renaming/` | Provenance-checked coordinate and reference edits |
 | `stages/resolution_cleanup/resolution_cleanup.py` | Resolution/statistic rounding, shell sorting, cutoff synchronization |
 | `stages/deposit/deposition.py` | OneDep lifecycle and serializable results |
-| `stages/validation_report/val_report.py` | Standalone post-deposition dashboard; no registered toolkit command |
+| `stages/validation_report/val_report.py` | Post-deposition dashboard and PDF collection, used by `validation-report` |
 | `scripts/` | Earlier launchers/batch recipes; not the command registry and not the canonical workflow |
 
 For repository source, start at [the package](https://github.com/PDBeurope/deposition-toolkit/tree/main/src/deposition_toolkit). The `main` branch link may differ from a local checkout's revision; module names above identify the implementation to inspect.

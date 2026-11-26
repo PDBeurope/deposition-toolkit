@@ -13,6 +13,7 @@ from . import (
     prepare_dataset,
     resolution_cleanup,
     submission_report,
+    validation_report,
 )
 
 
@@ -29,4 +30,5 @@ COMMAND_MODULES = (
     ccd_finalise,
     lig_rename,
     deposit,
+    validation_report,
 )

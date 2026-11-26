@@ -26,6 +26,7 @@ Global `--verbose` precedes the command and shows detailed live diagnostics alon
 | `lig-rename <work-dir>` | `--summary-csv` optional per-ligand code override | [Renaming](commands/lig-rename.md) |
 | `resolution-cleanup <work-dir>` | `--config` / `-c`; `--pattern` / `-p`; `--output-suffix` / `-o`; `--block`; `--dry-run` / `-d`; `--verbose-resolution` / `-v` | [Cleanup](commands/resolution-cleanup.md) |
 | `deposit <work-dir>` | `--email`, `--users` from shared `WWPDB_*` settings (`.env` or environment); `--country UK`; `--experiment-type XRAY`; `--no-poll`; `--poll-interval 5`; `--max-polls 64`; `--dry-run` | [Deposition](commands/deposit.md) |
+| `validation-report <work-dir>` | None; uses configured `DEPOSITION_ROOT`; creates HTML, metadata CSV and PDF ZIP | [Post-deposition reports](commands/validation-report.md) |
 | `ledger <check\|current\|upgrade>` | None | [Ledger](commands/ledger.md) |
 | `ledger load-manifest <work_dir>` | Approval when the group already exists | [Manifest storage](commands/ledger.md#load-structure-manifests) |
 

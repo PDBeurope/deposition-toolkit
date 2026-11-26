@@ -47,6 +47,9 @@ uv run deposition-toolkit lig-rename "$WORK_DIR"
 
 uv run deposition-toolkit mmcif-validation "$WORK_DIR"
 uv run deposition-toolkit deposit "$WORK_DIR"
+
+# Once OneDep has generated the validation reports:
+uv run deposition-toolkit validation-report "$WORK_DIR"
 ```
 
 This example uses the configured tools, databases, and exported depositor identity. For new ligands, `--allocate-codes` consumes IDs from the configured CCD pool. See the [CLI reference](docs/cli.md) for all parameters and the [getting-started guide](docs/getting-started.md) for metadata preparation, previews, and code reuse.

@@ -93,3 +93,13 @@ uv run deposition-toolkit deposit /processing/sample --email depositor@example.o
 ```
 
 The wrapper reuses registry sessions for retries. Preserve the local OneDep session files as well as manifests. Read [deposition internals](commands/deposit.md) before relying on a successful status: polling exhaustion and `--no-poll` do not establish remote processing completion.
+
+## Collect OneDep validation reports
+
+After deposition, allow OneDep time to generate its validation reports, then run:
+
+```bash
+uv run deposition-toolkit validation-report /processing/sample
+```
+
+The command reads the configured `DEPOSITION_ROOT` and creates a dashboard, metadata CSV and ZIP of full validation PDFs in `results/validation_report/`, with the dataset name in each filename. Missing reports produce partial results and a nonzero exit status; rerun the same command later. See [post-deposition reports](commands/validation-report.md).

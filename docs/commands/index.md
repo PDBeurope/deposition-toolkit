@@ -21,6 +21,7 @@ Each page separates wrapper responsibilities from stage logic and explains input
 | `lig-rename` | Provenance-checked CIF edits | [Identity and reference checks](lig-rename.md) |
 | `resolution-cleanup` | Numeric transformations and comparisons | [Cleanup sequence](resolution-cleanup.md) |
 | `deposit` | Remote workflow with local sessions and database recovery | [Deposition lifecycle](deposit.md) |
+| `validation-report` | Reads latest OneDep XML, model CIF and PDF files | [Post-deposition reports](validation-report.md) |
 | `ledger` | Database connectivity/schema management | [Transactions and migrations](ledger.md) |
 
-Common to most wrappers: excluded structures get `not applicable`; otherwise a command runs without checking earlier step statuses. See [shared state rules](../data-and-state.md).
+`validation-report` selects successful, non-dry-run depositions. Common to most other wrappers: excluded structures get `not applicable`; otherwise a command runs without checking earlier step statuses. See [shared state rules](../data-and-state.md).

@@ -1,21 +1,11 @@
 #!/usr/bin/env python3
-"""Build a self-contained PDBe validation summary dashboard from OneDep IDs.
+"""Parse OneDep reports and render the toolkit's validation dashboard.
 
-Examples:
-    python val_report.py D_1292159901 D_1292159902
-    python val_report.py --id-file deposition_ids.txt -o report.html
-    python val_report.py --id-file deposition_ids.txt --collect-val-pdf
-
-For each deposition ID the program resolves the latest validation XML and model
-mmCIF under DEPOSITION_ROOT, enriches the validation report with PDB accession
-and entry title, and writes a self-contained HTML dashboard plus a CSV-formatted
-metadata text file.  Optionally it also collects the latest full validation PDFs
-into a ZIP archive.
+The public command is ``deposition-toolkit validation-report <work-dir>``.
 """
 
 from __future__ import annotations
 
-import argparse
 import csv
 import html
 import json
@@ -28,7 +18,6 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
-from deposition_toolkit.config import get_settings
 
 PAGE_TITLE = "PDBe interactive validation report"
 PAGE_HEADING = "PDBe Validation Summary"
@@ -220,7 +209,7 @@ def residue_issue_score(attrs: Dict[str, str], child_tags: List[str]) -> Tuple[i
 def parse_validation_xml(path: Path, deposition_id: str, pdb_id: Optional[str] = None, entry_title: Optional[str] = None, model_file: Optional[Path] = None, warnings: Optional[List[str]] = None) -> Dict[str, Any]:
     try:
         tree = ET.parse(path)
-    except ET.ParseError as exc:
+    except (ET.ParseError, OSError) as exc:
         return error_report(
             deposition_id,
             f"XML parse error: {exc}",
@@ -514,32 +503,6 @@ def error_report(
     }
 
 
-def split_deposition_ids(values: Iterable[str]) -> List[str]:
-    result: List[str] = []
-    seen = set()
-    for value in values:
-        for dep_id in re.split(r"[\s,]+", value.strip()):
-            if not dep_id or dep_id.startswith("#"):
-                continue
-            if dep_id not in seen:
-                seen.add(dep_id)
-                result.append(dep_id)
-    return result
-
-
-def load_deposition_ids(cli_ids: Iterable[str], id_file: Optional[Path]) -> List[str]:
-    values = list(cli_ids)
-    if id_file is not None:
-        if not id_file.is_file():
-            raise FileNotFoundError(f"Deposition ID file does not exist: {id_file}")
-        for raw_line in id_file.read_text(encoding="utf-8").splitlines():
-            line = raw_line.split("#", 1)[0].strip()
-            if not line:
-                continue
-            values.append(line)
-    return split_deposition_ids(values)
-
-
 def process_deposition(deposition_id: str, base_path: Path) -> Tuple[Dict[str, Any], List[str]]:
     problems: List[str] = []
     if not re.fullmatch(r"D_\d+", deposition_id, flags=re.IGNORECASE):
@@ -622,6 +585,10 @@ def collect_validation_pdfs(deposition_ids: List[str], base_path: Path, zip_path
     problem_ids: set[str] = set()
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for deposition_id in deposition_ids:
+            if not re.fullmatch(r"D_\d+", deposition_id, flags=re.IGNORECASE):
+                log_problem(deposition_id, "Invalid deposition ID format (expected D_<digits>)")
+                problem_ids.add(deposition_id)
+                continue
             dep_dir = base_path / deposition_id
             pdf_file = latest_matching(dep_dir, f"{deposition_id}_val-report-full_P1.pdf.V*") if dep_dir.is_dir() else None
             if pdf_file is None:
@@ -808,60 +775,7 @@ render();
 </body></html>'''
 
 
-def main(argv: Optional[List[str]] = None) -> int:
-    deposition_root = get_settings().deposition_root.expanduser()
-    ap = argparse.ArgumentParser(
-        description="Create the self-contained PDBe validation summary dashboard from OneDep deposition IDs."
-    )
-    ap.add_argument("deposition_ids", nargs="*", help="One or more deposition IDs, e.g. D_1292159901")
-    ap.add_argument("-f", "--id-file", type=Path, help="Text file containing deposition IDs (one or more per line)")
-    ap.add_argument("-o", "--output", type=Path, default=Path("validation_dashboard.html"), help="Output HTML path")
-    ap.add_argument("--metadata-output", type=Path, help="Metadata text/CSV output path (default: <html-stem>_metadata.txt)")
-    ap.add_argument("--collect-val-pdf", action="store_true", help="Collect latest full validation PDF for each deposition into a ZIP")
-    ap.add_argument("--pdf-zip", type=Path, help="Validation PDF ZIP path (default: <html-stem>_validation_pdfs.zip)")
-    ap.add_argument(
-        "--base-path",
-        type=Path,
-        default=deposition_root,
-        help=f"OneDep deposition root (default: {deposition_root})",
-    )
-    args = ap.parse_args(argv)
-
-    try:
-        deposition_ids = load_deposition_ids(args.deposition_ids, args.id_file)
-    except (OSError, FileNotFoundError) as exc:
-        ap.error(str(exc))
-    if not deposition_ids:
-        ap.error("Provide at least one deposition ID on the command line or with --id-file")
-
-    reports: List[Dict[str, Any]] = []
-    problem_ids = set()
-    for deposition_id in deposition_ids:
-        report, problems = process_deposition(deposition_id, args.base_path)
-        reports.append(report)
-        if problems:
-            problem_ids.add(deposition_id)
-
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(build_html(reports), encoding="utf-8")
-
-    metadata_path = args.metadata_output or args.output.with_name(f"{args.output.stem}_metadata.txt")
-    write_metadata_file(metadata_path, reports)
-
-    pdf_zip_path: Optional[Path] = None
-    if args.collect_val_pdf:
-        pdf_zip_path = args.pdf_zip or args.output.with_name(f"{args.output.stem}_validation_pdfs.zip")
-        problem_ids.update(collect_validation_pdfs(deposition_ids, args.base_path, pdf_zip_path))
-
-    print(f"Wrote HTML: {args.output} ({len(reports)} deposition(s))")
-    print(f"Wrote metadata: {metadata_path}")
-    if pdf_zip_path is not None:
-        print(f"Wrote validation PDF ZIP: {pdf_zip_path}")
-    if problem_ids:
-        print(f"Completed with issues for {len(problem_ids)} deposition(s): {', '.join(sorted(problem_ids))}", file=sys.stderr)
-        return 2
-    return 0
-
-
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from deposition_toolkit.cli import main
+
+    raise SystemExit(main(["validation-report", *sys.argv[1:]]))

@@ -293,16 +293,24 @@ class StageConfigurationTests(unittest.TestCase):
             self.assertEqual(parser.parse_args(["prepare-dataset", "data.tgz", "--work-root", "/override"]).work_root,
                              "/override")
 
-    def test_validation_report_uses_configured_root_and_base_path_override(self):
-        with configured_directory("DEPOSITION_ROOT=/configured/deposit\n"):
-            for extra, expected in (([], Path("/configured/deposit")),
-                                    (["--base-path", "/override"], Path("/override"))):
-                with self.subTest(extra=extra), patch.object(val_report, "process_deposition",
-                                                          return_value=({}, [])) as process:
-                    with patch.object(val_report, "build_html", return_value="<html></html>"), \
-                         patch.object(val_report, "write_metadata_file"), patch("builtins.print"):
-                        self.assertEqual(val_report.main(["D_123"] + extra), 0)
-                    process.assert_called_once_with("D_123", expected)
+    def test_validation_report_uses_configured_root(self):
+        from deposition_toolkit.commands import validation_report
+        from deposition_toolkit.stages.common.manifest import write_manifest
+
+        with configured_directory("DEPOSITION_ROOT=/configured/deposit\n") as root:
+            structure = root / "sample"
+            structure.mkdir()
+            write_manifest(structure, {
+                "deposition_id": "D_123", "steps": {"deposition": {"status": "done"}},
+            })
+            with patch.object(val_report, "process_deposition", return_value=({}, [])) as process, \
+                 patch.object(val_report, "build_html", return_value="<html></html>"), \
+                 patch.object(val_report, "write_metadata_file"), \
+                 patch.object(val_report, "collect_validation_pdfs", return_value=set()) as collect, \
+                 patch("builtins.print"):
+                self.assertEqual(validation_report.run(argparse.Namespace(work_dir=str(root))), 0)
+            process.assert_called_once_with("D_123", Path("/configured/deposit"))
+            self.assertEqual(collect.call_args.args[:2], (["D_123"], Path("/configured/deposit")))
 
 
 if __name__ == "__main__":

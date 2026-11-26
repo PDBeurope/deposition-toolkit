@@ -34,6 +34,7 @@ STEP_CCD_FINALISE = "ccd_finalise"
 STEP_LIG_RENAME = "lig_rename"
 STEP_RESOLUTION_CLEANUP = "resolution_cleanup"
 STEP_DEPOSITION = "deposition"
+STEP_VALIDATION_REPORT = "validation_report"
 
 
 @contextmanager
