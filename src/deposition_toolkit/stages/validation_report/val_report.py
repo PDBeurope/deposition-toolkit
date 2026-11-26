@@ -505,6 +505,7 @@ def error_report(
 
 def process_deposition(deposition_id: str, base_path: Path) -> Tuple[Dict[str, Any], List[str]]:
     problems: List[str] = []
+    warnings: List[str] = []
     if not re.fullmatch(r"D_\d+", deposition_id, flags=re.IGNORECASE):
         msg = "Invalid deposition ID format (expected D_<digits>)"
         log_problem(deposition_id, msg)
@@ -529,8 +530,8 @@ def process_deposition(deposition_id: str, base_path: Path) -> Tuple[Dict[str, A
             pdb_id, entry_title = parse_model_metadata(model_file)
             if not pdb_id:
                 msg = f"PDB ID not found in model CIF: {model_file.name}"
-                log_problem(deposition_id, msg)
-                problems.append(msg)
+                print(f"WARNING [{deposition_id}] {msg}", file=sys.stderr)
+                warnings.append(msg)
             if not entry_title:
                 msg = f"Entry title not found in model CIF: {model_file.name}"
                 log_problem(deposition_id, msg)
@@ -550,7 +551,7 @@ def process_deposition(deposition_id: str, base_path: Path) -> Tuple[Dict[str, A
             model_file=model_file,
             pdb_id=pdb_id,
             entry_title=entry_title,
-            warnings=problems,
+            warnings=problems + warnings,
         ), problems
 
     report = parse_validation_xml(
@@ -559,7 +560,7 @@ def process_deposition(deposition_id: str, base_path: Path) -> Tuple[Dict[str, A
         pdb_id=pdb_id,
         entry_title=entry_title,
         model_file=model_file,
-        warnings=problems,
+        warnings=problems + warnings,
     )
     if report.get("parse_error"):
         log_problem(deposition_id, report["parse_error"])

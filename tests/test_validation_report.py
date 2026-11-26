@@ -89,6 +89,45 @@ class ValidationReportTests(unittest.TestCase):
         self.assertEqual(self.run_command(), 0)
         self.assertNotIn('error', self.step(directory))
 
+    def test_missing_pdb_id_warns_without_failing_and_clears_previous_failure(self):
+        directory = self.structure('sample')
+        self.assertEqual(self.run_command(), 1)
+        production = self.reports()
+        (production / 'D_123_model_P1.cif.V1').write_text(
+            "data_model\n_struct.title 'Example structure'\n")
+        self.structure('with_pdb_id', dep_id='D_456')
+        self.reports('D_456')
+        args = build_parser().parse_args(['validation-report', str(self.work)])
+        output = io.StringIO()
+        with redirect_stdout(output), redirect_stderr(io.StringIO()):
+            self.assertEqual(args.func(args), 0)
+        self.assertIn('2 succeeded, 0 failed', output.getvalue())
+        self.assertIn('WARNING: PDB IDs missing for 1 deposition(s) in dataset my_dataset.', output.getvalue())
+        self.assertNotIn('may still be generating', output.getvalue())
+        step = self.step(directory)
+        self.assertEqual(step['status'], 'done')
+        self.assertNotIn('error', step)
+        self.assertIn('PDB ID not found', step['warnings'][0])
+        log = (self.work / step['log']).read_text()
+        self.assertIn('WARNING [D_123] PDB ID not found', log)
+        self.assertNotIn('ERROR [D_123]', log)
+        for output_path in step['outputs']:
+            self.assertTrue((self.work / output_path).is_file())
+        with (self.work / step['outputs'][1]).open() as stream:
+            self.assertEqual(list(csv.reader(stream))[1], ['Example structure', 'D_123', ''])
+
+    def test_missing_pdb_id_does_not_hide_missing_pdf_failure(self):
+        directory = self.structure('sample')
+        production = self.reports(pdf=False)
+        (production / 'D_123_model_P1.cif.V1').write_text(
+            "data_model\n_struct.title 'Example structure'\n")
+        self.assertEqual(self.run_command(), 1)
+        step = self.step(directory)
+        self.assertEqual(step['status'], 'failed')
+        self.assertIn('PDF', step['error'])
+        self.assertNotIn('PDB ID', step['error'])
+        self.assertIn('PDB ID not found', step['warnings'][0])
+
     def test_skip_undeposited_dry_run_and_excluded_and_fail_missing_id(self):
         pending = self.structure('pending', status='failed')
         dry = self.structure('dry', steps={'deposition': {'status': 'done', 'reports': {'dry_run': True}}})

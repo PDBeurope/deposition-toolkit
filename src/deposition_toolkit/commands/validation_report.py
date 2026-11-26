@@ -76,7 +76,11 @@ def run(args: argparse.Namespace) -> int:
                 problems = outcomes[deposition_id]
                 update_step(structure_dir, STEP_VALIDATION_REPORT, "failed" if problems else "done",
                             error="; ".join(problems) or None,
-                            extra={"dataset": dataset, "deposition_id": deposition_id})
+                            extra={"dataset": dataset, "deposition_id": deposition_id,
+                                   "warnings": reports[deposition_id].get("warnings", [])})
+        missing_pdb_ids = sum(not report.get("pdb_id") for report in reports.values())
+        if missing_pdb_ids:
+            print(f"WARNING: PDB IDs missing for {missing_pdb_ids} deposition(s) in dataset {dataset}.")
         try:
             dashboard.write_text(val_report.build_html(list(reports.values())), encoding="utf-8")
             val_report.write_metadata_file(metadata, list(reports.values()))
@@ -101,7 +105,8 @@ def run(args: argparse.Namespace) -> int:
             update_step(structure_dir, STEP_VALIDATION_REPORT, "failed" if problems else "done",
                         outputs=relative_outputs([dashboard, metadata, pdf_zip], work_dir),
                         error="; ".join(problems) or None,
-                        extra={"dataset": dataset, "deposition_id": deposition_id, "log": step["log"]})
+                        extra={"dataset": dataset, "deposition_id": deposition_id, "log": step["log"],
+                               "warnings": step.get("warnings", [])})
             with (work_dir / step["log"]).open("a", encoding="utf-8") as log:
                 log.write("Final validation report result: " + ("; ".join(problems) if problems else "done") + "\n")
         for output in (dashboard, metadata, pdf_zip):
